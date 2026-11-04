@@ -1,0 +1,125 @@
+"""What ``GET /api/forecast-viewer/`` promises the web bundle, and to whom.
+
+The route is the whole of the plugin's public surface, so its tenant boundary
+is asserted here from both sides: a source on a collection the caller may not
+see is absent, not forbidden, and another organisation's rows never appear
+however they are named.
+"""
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, dial_org, join_org
+from georiva_forecast_viewer.models import Quantity
+
+from .factories import WRF_VARIABLES, bind, make_collection, make_quantity, make_source
+
+URL = "georiva_forecast_viewer:catalogue"
+
+
+class CatalogueTests(TestCase):
+    def setUp(self):
+        dial_org(self.client)
+
+    def _quantities(self):
+        return self.client.get(reverse(URL)).json()["quantities"]
+
+    def test_a_scalar_quantity_lists_each_source_with_its_own_variable(self):
+        temperature = make_quantity("t2m", name="2 m temperature")
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs", name="ECMWF IFS")
+        wrf = make_source(make_collection("wrf-3km", variables=WRF_VARIABLES), slug="wrf", name="KMD WRF", order=1)
+        bind(ifs, temperature, variable="t2m")
+        bind(wrf, temperature, variable="t2")
+
+        self.assertEqual(
+            self._quantities(),
+            [
+                {
+                    "slug": "t2m",
+                    "name": "2 m temperature",
+                    "kind": "scalar",
+                    "sources": [
+                        {
+                            "slug": "ifs",
+                            "name": "ECMWF IFS",
+                            "catalog": "models",
+                            "collection": "ecmwf-ifs",
+                            "variable": "t2m",
+                        },
+                        {
+                            "slug": "wrf",
+                            "name": "KMD WRF",
+                            "catalog": "models",
+                            "collection": "wrf-3km",
+                            "variable": "t2",
+                        },
+                    ],
+                }
+            ],
+        )
+
+    def test_a_vector_quantity_carries_the_u_v_pair(self):
+        wind = make_quantity("wind10", name="10 m wind", kind=Quantity.Kind.VECTOR)
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs")
+        bind(ifs, wind, u="10u", v="10v")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["kind"], "vector")
+        [source] = quantity["sources"]
+        self.assertEqual((source["u"], source["v"]), ("10u", "10v"))
+        self.assertNotIn("variable", source)
+
+
+class CatalogueVisibilityTests(TestCase):
+    """A source is offered to exactly the callers its collection is served to (ADR 0014)."""
+
+    def setUp(self):
+        dial_org(self.client)
+        self.temperature = make_quantity("t2m")
+
+    def _sources(self):
+        quantities = self.client.get(reverse(URL)).json()["quantities"]
+        return [source["slug"] for quantity in quantities for source in quantity["sources"]]
+
+    def _member(self):
+        user = get_user_model().objects.create_user(username="member", password="not-a-real-password")
+        join_org(user)
+        self.client.force_login(user)
+
+    def _source_on(self, visibility, slug, org_slug=DEFAULT_TEST_ORG_SLUG):
+        collection = make_collection(f"{slug}-collection", visibility=visibility, org_slug=org_slug)
+        quantity = self.temperature if org_slug == DEFAULT_TEST_ORG_SLUG else make_quantity("t2m", org_slug=org_slug)
+        bind(make_source(collection, slug=slug), quantity, variable="t2m")
+
+    def test_a_private_source_is_absent_for_a_stranger(self):
+        self._source_on("public", "open")
+        self._source_on("private", "closed")
+        self.assertEqual(self._sources(), ["open"])
+
+    def test_a_private_source_is_offered_to_a_member(self):
+        self._source_on("public", "open")
+        self._source_on("private", "closed")
+        self._member()
+        self.assertEqual(sorted(self._sources()), ["closed", "open"])
+
+    def test_an_internal_source_is_offered_to_nobody(self):
+        self._source_on("internal", "hidden")
+        self._member()
+        self.assertEqual(self._sources(), [])
+
+    def test_a_quantity_with_no_visible_source_is_omitted(self):
+        self._source_on("private", "closed")
+        self.assertEqual(self.client.get(reverse(URL)).json()["quantities"], [])
+
+    def test_another_organisations_source_never_appears_however_it_is_named(self):
+        self._source_on("public", "ifs")
+        self._source_on("public", "ifs", org_slug="other-org")
+        self.assertEqual(self._sources(), ["ifs"])
+
+    def test_an_unconfigured_organisation_answers_its_config_and_no_quantities(self):
+        body = self.client.get(reverse(URL)).json()
+        self.assertEqual(body["config"]["org"], DEFAULT_TEST_ORG_SLUG)
+        self.assertEqual(body["config"]["basemap_style"], None)
+        self.assertEqual(body["config"]["default_view"], {"center": [20.0, 0.0], "zoom": 3.0})
+        self.assertEqual(body["quantities"], [])

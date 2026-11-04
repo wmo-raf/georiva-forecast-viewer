@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "georiva-forecast-viewer"
+version = "0.1.0"
+description = "Forecast viewer: the first GeoRiva app. Switch models, pick a run, step through lead times on a full-screen map."
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "WMO RAF" }]
+classifiers = []
+# `georiva` (the core) is deliberately not listed: it is provided by the runtime
+# environment — the GeoRiva image, or the uv workspace where core is a sibling
+# member of the same virtualenv. Everything the plugin half needs comes from core.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/wmo-raf/georiva-forecast-viewer"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# The built web bundle (web/ → static/forecast_viewer/) is committed on release
+# and ships inside the wheel: the plugin installer (core's ADR 0035) has no
+# node and runs no hooks, so what is in git at the tag is what a server gets.
+[tool.setuptools.package-data]
+georiva_forecast_viewer = ["static/**/*"]
