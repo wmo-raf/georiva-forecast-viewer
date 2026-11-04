@@ -21,6 +21,8 @@
  * time.
  */
 
+import { WORLD_LONGITUDES, WORLD_SHIFTS } from "./longitude";
+
 /** A longitude/latitude rectangle: `[west, south, east, north]`. */
 export type Bounds = [number, number, number, number];
 
@@ -39,8 +41,6 @@ export const BASE_PARTICLES = 5000;
  * boost reaches it.
  */
 export const MAX_BOOST = 8;
-
-const WORLD_LONGITUDES = 360;
 
 function overlap(lowA: number, highA: number, lowB: number, highB: number): number {
   return Math.max(0, Math.min(highA, highB) - Math.max(lowA, lowB));
@@ -67,9 +67,9 @@ export function visibleFraction(data: Bounds, viewport: Bounds): number {
   if (longitudes <= 0 || latitudes <= 0) return 1;
 
   const [dataWest, dataSouth, dataEast, dataNorth] = data;
-  const covered = [-WORLD_LONGITUDES, 0, WORLD_LONGITUDES]
-    .map((shift) => overlap(dataWest + shift, dataEast + shift, west, west + longitudes))
-    .reduce((total, span) => total + span, 0);
+  const covered = WORLD_SHIFTS.map((shift) =>
+    overlap(dataWest + shift, dataEast + shift, west, west + longitudes),
+  ).reduce((total, span) => total + span, 0);
 
   return Math.min(1, (covered / longitudes) * (overlap(dataSouth, dataNorth, south, north) / latitudes));
 }

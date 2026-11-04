@@ -37,6 +37,21 @@ export function cellOf(cells: DayCell[], step: number): DayCell | undefined {
   return cells.find((c) => c.steps.includes(step));
 }
 
+/**
+ * One step named in full: the UTC day and the time of day.
+ *
+ * The strip's floating label says which step is on screen, and anything else
+ * that names one should say it the same way. UTC and the module's own weekday
+ * names, not the viewer's locale: a forecast time shifted into local time
+ * would not line up with the cells it sits over.
+ */
+export function stepLabel(iso: string): string {
+  const date = new Date(iso);
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} · ${hours}:${minutes} UTC`;
+}
+
 /** Where in its day a step falls, 0 at midnight to just under 1 at the end of the day. */
 export function progressWithin(times: string[], step: number): number {
   const date = new Date(times[step]);

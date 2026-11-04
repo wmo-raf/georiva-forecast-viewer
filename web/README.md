@@ -58,7 +58,40 @@ dense regardless.
 - Day strip (`DayStrip.vue`, `state/daystrip.ts`): one cell per UTC day of
   the run, the playhead at the step's hour of day, a floating label with the
   exact step, play and step buttons.
-- Legend (`Legend.vue`): the palette as a bar with stop values and the unit.
+- Legend (`Legend.vue`, `ui/legend.ts`): the palette as a bar with stop values
+  and the unit, placed over the `palette_min`/`palette_max` span EDR gives for
+  display — which is deliberately not the texture's encoding range.
+There is no hover readout. One was built and taken out again; what it was
+built on is still here, and the next section says why.
+
+## Reading a value at a point
+
+`map/sample.ts` and `map/wind.ts` can say what the data is at a place, and
+nothing in the UI calls them. That is deliberate rather than an oversight: the
+hover readout they were written for is deferred (issue #4), with no verdict on
+the idea — the panel simply carried too much for one number, and a second
+attempt should show the value and its unit and leave the model and step to the
+rest of the screen.
+
+They are kept because the capability costs nothing to hold and is awkward to
+rebuild. A value at a point needs no request of its own: the pixels were
+fetched to draw the frame and they carry values rather than colours (ADR 0021),
+so `sample.ts` takes the nearest pixel of the texture already on screen and
+unscales it with the same expression the layer's shader uses — which is what
+makes a number agree with the colour drawn over it. `wind.ts` turns a u/v pair
+into a speed and a bearing in the convention `docs/wind-direction-check.md`
+checked against both models' source data: degrees clockwise from north, naming
+where the wind comes from.
+
+Two things any caller has to handle. Alpha below full means the texture has no
+value there — a nodata cell, outside a regional domain, outside a display clip
+(ADR 0038) — and a sample cannot tell that from a texture that has not loaded,
+so a UI showing a reading has to say which of the two it means. And a texture
+pixel is 8 bits, so the value is quantised: one step is the variable's
+configured range over 255, half a degree for a −60…60 °C range, with the wind's
+own cost worked through in `docs/wind-direction-check.md`. The decode lands on
+the bottom of a pixel's step, as the shader does, which is what keeps it
+consistent with the colour it would be explaining.
 
 ## Development
 
