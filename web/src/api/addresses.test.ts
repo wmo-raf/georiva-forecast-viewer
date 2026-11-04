@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogueUrl, edrCollectionUrl, encodedPreviewUrl, runsUrl } from "./addresses";
+import { catalogueUrl, edrCollectionUrl, encodedPreviewUrl, runsUrl, vectorPreviewUrl } from "./addresses";
 
 const source = {
   slug: "ifs",
@@ -10,6 +10,8 @@ const source = {
   descriptor: "",
   version: "ab12cd34",
 };
+
+const wind = { ...source, variable: undefined, u: "10u", v: "10v", version: "ef56ab78" };
 
 describe("every address the viewer asks GeoRiva for", () => {
   it("the catalogue", () => {
@@ -30,5 +32,25 @@ describe("every address the viewer asks GeoRiva for", () => {
       "/titiler/kmd/models/ecmwf-ifs/t2m/encoded-preview.png" +
         "?time=2026-11-03T15%3A00%3A00%2B00%3A00&reftime=2026-11-03T12%3A00%3A00%2B00%3A00&v=ab12cd34",
     );
+  });
+
+  it("the two-band vector texture, on the collection, with the pair named in the query", () => {
+    const url = vectorPreviewUrl("kmd", wind, "2026-11-03T15:00:00+00:00", "2026-11-03T12:00:00+00:00");
+    expect(url).toBe(
+      "/titiler/kmd/models/ecmwf-ifs/vector-preview.png" +
+        "?u_variable=10u&v_variable=10v&time=2026-11-03T15%3A00%3A00%2B00%3A00" +
+        "&reftime=2026-11-03T12%3A00%3A00%2B00%3A00&v=ef56ab78",
+    );
+  });
+
+  it("leaves reftime off a vector texture when the source has no run", () => {
+    expect(vectorPreviewUrl("kmd", wind, "2026-11-03T15:00:00Z", null)).toBe(
+      "/titiler/kmd/models/ecmwf-ifs/vector-preview.png" +
+        "?u_variable=10u&v_variable=10v&time=2026-11-03T15%3A00%3A00Z&v=ef56ab78",
+    );
+  });
+
+  it("has no vector address for a source that is not a bound pair", () => {
+    expect(() => vectorPreviewUrl("kmd", source, "2026-11-03T15:00:00Z", null)).toThrow(/u and v/);
   });
 });

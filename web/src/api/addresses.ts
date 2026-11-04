@@ -40,3 +40,22 @@ export function encodedPreviewUrl(
   params.set("v", source.version);
   return `/titiler/${org}/${source.catalog}/${source.collection}/${variable}/encoded-preview.png?${params}`;
 }
+
+/**
+ * The two-band (u, v) texture of one step, for the particle layer (core's #593).
+ *
+ * Addressed on the *collection*, with the pair named in the query, because the
+ * nginx gate decides visibility per collection and one decision has to cover
+ * both components (ADR 0021's amendment). `version` is the pair's own token,
+ * which the plugin mints from both ranges: the two bands are encoded over the
+ * union of them, so an edit to either moves every pixel of both.
+ */
+export function vectorPreviewUrl(org: string, source: Source, time: string, reftime: string | null): string {
+  if (!source.u || !source.v) {
+    throw new Error(`${source.slug} has no u and v pair to build a vector texture from`);
+  }
+  const params = new URLSearchParams({ u_variable: source.u, v_variable: source.v, time });
+  if (reftime) params.set("reftime", reftime);
+  params.set("v", source.version);
+  return `/titiler/${org}/${source.catalog}/${source.collection}/vector-preview.png?${params}`;
+}

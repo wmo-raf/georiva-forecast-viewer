@@ -8,7 +8,7 @@
  */
 
 import { computed, reactive, watch } from "vue";
-import { encodedPreviewUrl } from "../api/addresses";
+import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
 import { loadCatalogue, loadEdr, loadRuns } from "../api/client";
 import type { Catalogue, EdrCollection, EdrParameter, Source } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
@@ -80,6 +80,9 @@ const windBinding = computed<Source | null>(() => {
   return null;
 });
 
+/** The wind binding the map should draw: the toggle is on and the source has one. Null otherwise. */
+const windToDraw = computed<Source | null>(() => (state.windOn ? windBinding.value : null));
+
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
 
@@ -92,7 +95,7 @@ const times = computed(() => run.value?.valid_times ?? []);
 
 const time = computed(() => times.value[state.step] ?? null);
 
-/** The scalar variable on the map; vector quantities are the next slice. */
+/** The scalar variable on the map; the wind pair is drawn beside it, from `windToDraw`. */
 const variable = computed(() => source.value?.variable ?? null);
 
 const parameter = computed<EdrParameter | null>(() =>
@@ -103,6 +106,21 @@ const textureUrl = computed(() => {
   const org = state.catalogue?.config.org;
   if (!org || !source.value || !variable.value || !time.value || !run.value) return null;
   return encodedPreviewUrl(org, source.value, variable.value, time.value, run.value.reference_time);
+});
+
+/**
+ * The wind pair's texture for the same run and step as the raster.
+ *
+ * `run` and `time` come from the scalar source's timeline, and are the wind's
+ * too: a source is one collection, and the wind binding found for the selected
+ * source slug is a binding of that same collection, so both quantities are read
+ * from one run's items.
+ */
+const windTextureUrl = computed(() => {
+  const org = state.catalogue?.config.org;
+  const wind = windToDraw.value;
+  if (!org || !wind || !time.value || !run.value) return null;
+  return vectorPreviewUrl(org, wind, time.value, run.value.reference_time);
 });
 
 async function load() {
@@ -159,9 +177,6 @@ function setWind(on: boolean) {
   state.windOn = on;
 }
 
-/** The wind binding the map should draw: the toggle is on and the source has one. Null otherwise. */
-const windToDraw = computed<Source | null>(() => (state.windOn ? windBinding.value : null));
-
 function pickRun(referenceTime: string) {
   if (state.timeline?.runs.some((r) => r.reference_time === referenceTime)) {
     state.timeline.selected = referenceTime;
@@ -196,6 +211,7 @@ export function useViewer() {
     variable,
     parameter,
     textureUrl,
+    windTextureUrl,
     load,
     pickQuantity,
     pickSource,
