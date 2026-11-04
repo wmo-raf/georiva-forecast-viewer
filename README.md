@@ -71,3 +71,6 @@ make test      # core's `just test georiva_forecast_viewer`, inside the dev stac
 make format    # ruff, pinned to core's version
 make lint
 ```
+
+The web half lives in `web/` and has its own README: `npm run dev` there serves
+it against the local stack, proxied under one organisation's host.
