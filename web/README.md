@@ -76,8 +76,27 @@ organisation.
 
 ## Versions that matter
 
-- `maplibre-gl` stays on 5.x: deck.gl's interleaved overlay reads the map's
-  transform, which MapLibre 6 no longer exposes, and the raster layer silently
-  never draws.
+- `maplibre-gl` is 6.x, with `@deck.gl/maplibre`'s `MapLibreOverlay` — not
+  `@deck.gl/mapbox`'s `MapboxOverlay`, which is what pinned this to 5.x before.
+  `MapboxOverlay` reads `map.transform`, which MapLibre 6 removed, and its
+  interleaved layer silently never draws; `MapLibreOverlay` uses MapLibre's
+  public API and declares `^4.5.1 || ^5 || ^6`. The move off 5.x was forced:
+  GHSA-jrc7-96c5-q579 is a critical XSS with no 5.x patch (see below).
+- MapLibre 6 is ESM-only with no default export, so the import is
+  `import * as maplibregl`, and every bundler needs one `setWorkerUrl()` call —
+  the worker is loaded from a real URL that Vite's module graph cannot resolve
+  from `import.meta.url`.
 - `weatherlayers-gl` is dual-licensed (MPL-2.0 or its own terms); the MPL
   option is what this bundle uses.
+
+### GHSA-jrc7-96c5-q579
+
+`DOM.sanitize()` in `maplibre-gl` skipped an attribute when stripping two
+dangerous ones in a row, because it mutated a live `NamedNodeMap` while
+iterating it. The surviving attribute executes when the attribution control
+writes it into `innerHTML` — zero-click XSS from a style's attribution string.
+
+That reaches this viewer: a basemap is whatever URL an operator puts in
+*Forecast viewer settings*, and its attribution is rendered on every map. It
+is fixed in 6.4.1 and nothing in the 5.x line was patched, which is why the
+MapLibre 6 move happened as a security fix rather than on its own schedule.

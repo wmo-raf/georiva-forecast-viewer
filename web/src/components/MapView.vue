@@ -15,17 +15,23 @@
  * playback never runs ahead of the wind; a failed load leaves the frame on
  * screen rather than blanking the map.
  */
-import { MapboxOverlay } from "@deck.gl/mapbox";
-// MapLibre 5, not 6: deck.gl's interleaved overlay reads the map's transform,
-// which 6 no longer exposes, so the raster layer would never draw.
-import maplibregl, { type StyleSpecification } from "maplibre-gl";
+import { MapLibreOverlay } from "@deck.gl/maplibre";
+// MapLibre 6 is ESM-only and has no default export, so the namespace import.
+// `setWorkerUrl` is the one-time call every bundler needs: the ESM build loads
+// its worker from a real URL, which `import.meta.url` cannot resolve inside
+// Vite's module graph.
+import * as maplibregl from "maplibre-gl";
+import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { ViewerConfig } from "../api/types";
 import { particleCount, type Bounds } from "../map/particles";
 import { loadTexture, type Texture } from "../map/texture";
 import { useViewer } from "../state/store";
+
+setWorkerUrl(workerUrl);
 
 /** A muted dark basemap so the data colours carry the picture; the settings model can replace it. */
 const DEFAULT_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -59,7 +65,7 @@ const container = ref<HTMLDivElement | null>(null);
 /** The view the particle budget is sized against; null until the map has laid out. */
 const viewport = ref<Bounds | null>(null);
 let map: maplibregl.Map | null = null;
-let overlay: MapboxOverlay | null = null;
+let overlay: MapLibreOverlay | null = null;
 let labelsLayerId: string | undefined;
 
 /** One texture under one URL: what is drawn, whether a newer frame is in flight, and the last failure. */
@@ -198,7 +204,7 @@ onMounted(() => {
     const style = map!.getStyle() as StyleSpecification;
     labelsLayerId = style.layers.find((l) => l.type === "symbol")?.id;
     readViewport();
-    overlay = new MapboxOverlay({ interleaved: true, layers: layers() });
+    overlay = new MapLibreOverlay({ interleaved: true, layers: layers() });
     map!.addControl(overlay);
   });
 });
