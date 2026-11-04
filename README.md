@@ -121,11 +121,19 @@ To cut a release:
 2. Run the **Release** workflow from the Actions tab (`workflow_dispatch`) with
    the version, including the `v` — `v0.2.0`. It only runs from main.
 
-It re-runs the web checks, builds the bundle, commits it to a detached commit
-on main's tip, pushes the tag, and opens a GitHub release carrying the manifest
-entry below. A tag is never moved or rebuilt: to fix a bad release, bump the
-version and cut another one, because a server pins a tag and is entitled to
-have it keep meaning one tree.
+It refuses to start unless CI is green for the commit it would release, re-runs
+the web checks, builds the bundle, commits it to a detached commit on main's
+tip, and then — before pushing anything — clones its own local tag the way the
+installer would and runs `collectstatic` in the core image, failing if
+`/static/forecast_viewer/index.html` does not come out of it. Only then is the
+tag pushed and a GitHub release opened with the manifest entry below. A tag is
+never moved or rebuilt: to fix a bad release, bump the version and cut another
+one, because a server pins a tag and is entitled to have it keep meaning one
+tree.
+
+It releases **main's tip at the moment you dispatch it**, which is not
+necessarily the commit that bumped the version — anything merged in between
+ships too. The release notes name the exact source commit for that reason.
 
 A site installs it through `deploy/plugins.toml`:
 

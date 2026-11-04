@@ -12,10 +12,10 @@ import pluginVue from "eslint-plugin-vue";
 import vueTs from "@vue/eslint-config-typescript";
 
 export default [
-  // Not in `extend-exclude` territory: these are directories ESLint should
-  // never walk. `dist/` is Vite's local output; the plugin's static folder is
-  // the built bundle, which lives outside web/ and so needs no entry here.
-  { ignores: ["dist/**", "node_modules/**"] },
+  // `dist/` is Vite's local output. `node_modules` needs no entry (ESLint
+  // ignores it by default), and neither does the built bundle, which lands
+  // outside web/ in the plugin's static folder.
+  { ignores: ["dist/**"] },
 
   js.configs.recommended,
 

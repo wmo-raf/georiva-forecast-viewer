@@ -104,8 +104,12 @@ npm run lint       # eslint; --fix with `npm run lint:fix`
 npm run build      # into the plugin's static folder
 ```
 
-CI runs all four on every pull request (`../.github/workflows/ci.yml`), so
-`npm ci && npm run lint && npm run typecheck && npm test` is the whole gate.
+CI runs all of these on every pull request (`../.github/workflows/ci.yml`), so
+`npm ci && npm run lint && npm run typecheck && npm test && npm run build` is
+the whole gate. The build is in it because a bundle that does not build would
+otherwise be found for the first time during a release; `vite build` also
+catches what `vue-tsc` cannot, such as an import that type-checks but has no
+runtime module behind it. On a pull request the output is thrown away.
 
 `eslint.config.js` is deliberately thin. `vue-tsc` already holds this code to
 a strict TypeScript contract, and `eslint-plugin-vue`'s recommended tiers are
@@ -136,6 +140,14 @@ organisation.
   from `import.meta.url`.
 - `weatherlayers-gl` is dual-licensed (MPL-2.0 or its own terms); the MPL
   option is what this bundle uses.
+- `package.json` carries one `overrides` entry, `minimatch: ^11.0.4`, which
+  package.json has no way to explain itself. The eslint tree arrives with
+  `minimatch` 10.x through both `@eslint/config-array` and
+  `@typescript-eslint/typescript-estree`, and every 10.x is subject to
+  GHSA-g3hv-75wg-m249 — a ReDoS via glob-parts amplification. It is
+  dev-only and `npm audit`'s own suggested fix was to downgrade eslint a major
+  version, so the override is the smaller change: eleven moderate advisories
+  to none, with nothing in either package's own range against 11.x.
 
 ### GHSA-jrc7-96c5-q579
 

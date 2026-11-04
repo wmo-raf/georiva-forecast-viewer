@@ -164,40 +164,52 @@ jobs:
           GEORIVA_LOG_LEVEL=WARNING
           EOF
 
-      # Three things in this command are load-bearing.
+      # Four things about this `georiva` wrapper are load-bearing.
       #
       # The settings module is core's *dev* settings even though this is the
       # production image. The two images share one venv and one copy of the app;
-      # dev settings are the ones that run a test database and do not demand a
-      # site's secrets, and nothing here exercises a production-only setting.
+      # dev settings are the ones that will build a test database and do not
+      # demand a site's secrets, and nothing here exercises a production-only
+      # setting.
       #
-      # PYTHONDONTWRITEBYTECODE stops the container, which runs as the image's
-      # own uid and not the runner's, from leaving root-owned __pycache__
-      # directories in the checkout.
+      # The mount is read-only because that is how a server has it. ADR 0035
+      # mounts the shared plugin volume read-only at /georiva/site-plugins in
+      # every backend service, so a plugin that needs to write inside its own
+      # package is already broken in production — and the failure would show up
+      # there rather than here if CI mounted it read-write. Nothing in this
+      # suite writes there today; the mount is what keeps that true.
+      #
+      # PYTHONDONTWRITEBYTECODE is the other half of that: the container runs
+      # as the image's own uid, not the runner's, and __pycache__ is the one
+      # thing Python would try to write into the mount unasked.
       #
       # The mount lands at /georiva/dev-plugins/<repo>, which core's settings
       # append to GEORIVA_PLUGIN_DIRS when it exists; discovery then derives the
       # app name from the package under src/, not from the folder.
       #
-      # --noinput is not decoration: on a leftover test database the runner
-      # prompts, and with no tty attached that is an EOFError, not a message.
-      - name: Run the plugin's test suite
+      # One step and a shell function rather than two steps repeating six
+      # flags. The two commands are grouped in the log, and each says plainly
+      # which it was when it fails.
+      - name: Run the plugin's tests and check its migrations
         run: |
-          docker run --rm --network host \
-            --env-file "$RUNNER_TEMP/ci.env" \
-            -e DJANGO_SETTINGS_MODULE=georiva.config.settings.dev \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            -v "$PWD/georiva-forecast-viewer:/georiva/dev-plugins/georiva-forecast-viewer:ro" \
-            "$GEORIVA_IMAGE" manage test --noinput --verbosity 2 georiva_forecast_viewer
+          georiva() {
+            docker run --rm --network host \
+              --env-file "$RUNNER_TEMP/ci.env" \
+              -e DJANGO_SETTINGS_MODULE=georiva.config.settings.dev \
+              -e PYTHONDONTWRITEBYTECODE=1 \
+              -v "$PWD/georiva-forecast-viewer:/georiva/dev-plugins/georiva-forecast-viewer:ro" \
+              "$GEORIVA_IMAGE" "$@"
+          }
 
-      # The suite builds its database from migrations, so a model changed
-      # without one usually passes and only fails on a server. The suite cannot
-      # catch that; this can.
-      - name: Check for missing migrations
-        run: |
-          docker run --rm --network host \
-            --env-file "$RUNNER_TEMP/ci.env" \
-            -e DJANGO_SETTINGS_MODULE=georiva.config.settings.dev \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            -v "$PWD/georiva-forecast-viewer:/georiva/dev-plugins/georiva-forecast-viewer:ro" \
-            "$GEORIVA_IMAGE" manage makemigrations --check --dry-run georiva_forecast_viewer
+          # --noinput is not decoration: on a leftover test database the runner
+          # prompts, and with no tty attached that is an EOFError, not a message.
+          echo "::group::Django test suite"
+          georiva manage test --noinput --verbosity 2 georiva_forecast_viewer
+          echo "::endgroup::"
+
+          # The suite builds its database from migrations, so a model changed
+          # without one usually passes and only fails on a server. The suite
+          # cannot catch that; this can.
+          echo "::group::Missing migrations"
+          georiva manage makemigrations --check --dry-run georiva_forecast_viewer
+          echo "::endgroup::"
