@@ -99,9 +99,24 @@ consistent with the colour it would be explaining.
 npm install
 npm run dev        # http://localhost:5173/static/forecast_viewer/
 npm test           # vitest, the pure modules
-npm run typecheck
+npm run typecheck  # vue-tsc
+npm run lint       # eslint; --fix with `npm run lint:fix`
 npm run build      # into the plugin's static folder
 ```
+
+CI runs all four on every pull request (`../.github/workflows/ci.yml`), so
+`npm ci && npm run lint && npm run typecheck && npm test` is the whole gate.
+
+`eslint.config.js` is deliberately thin. `vue-tsc` already holds this code to
+a strict TypeScript contract, and `eslint-plugin-vue`'s recommended tiers are
+mostly template formatting that no formatter here applies — so the config
+takes the plugin's `essential` tier plus a few correctness rules, and `lint`
+runs with `--max-warnings 0`. Nothing it reports can be ignored, which is the
+point of not loading it with warnings in the first place.
+
+`npm run build` writes into `../src/georiva_forecast_viewer/static/forecast_viewer/`,
+which is gitignored: the bundle is committed once per release by the release
+workflow, never by hand. See the root README.
 
 `npm run dev` proxies `/api` and `/titiler` to the local GeoRiva stack under
 one organisation's host. Copy `.env.example` to `.env` to point it at another

@@ -1,0 +1,185 @@
+name: Release
+
+# Cuts a release a server can install.
+#
+# The plugin installer (core's ADR 0035) does `git clone --depth 1 --branch
+# <tag>` and runs no hooks and no node: whatever is committed at the tag is
+# exactly what a server gets. The web bundle therefore has to be *in the tree
+# the tag points at* — and that is the whole reason this workflow exists.
+#
+# It does not put the bundle on main. A minified bundle re-committed on every
+# change would make main's history unreadable and every PR's diff useless, so
+# the bundle is built here and committed to a detached commit on top of the ref
+# being released; only the tag is pushed. Main stays source-only, and each tag
+# is main's tip plus exactly one commit holding the bundle:
+#
+#   main:  … ── A ── B (tip)
+#                      ╲
+#                       C ← v0.2.0   (B's tree + static/forecast_viewer/)
+#
+# Which means a tag is never moved or rebuilt. To fix a bad release, bump the
+# version and cut another one; a server pins a tag and is entitled to have it
+# keep meaning one tree.
+#
+# Releasing is a deliberate act, so this is dispatched by hand rather than
+# triggered by pushing a tag. Pushing the tag first could not work anyway: the
+# tag would already point at a commit with no bundle in it, and the only way
+# out would be to move the tag afterwards.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, matching pyproject.toml, with the "v" (e.g. v0.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Writes a tag and a release. Nothing else in this repo may.
+    permissions:
+      contents: write
+
+    steps:
+      # A release comes from main, whose tip CI has already gated — which is
+      # what lets this workflow re-run the web checks only (the bundle has to
+      # be built from this exact tree, so those are not a duplicate) and take
+      # ruff and the plugin's Django suite as already green.
+      - name: Refuse to release from anywhere but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::releases are cut from main; this run is on ${{ github.ref }}"
+          exit 1
+
+      # Full history: the tag is pushed from here, and a shallow clone cannot.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The version lives in three places that a server reads independently —
+      # the git tag it pins, the wheel metadata, and the manifest the installer
+      # shows an operator. A release where they disagree is a release nobody can
+      # identify afterwards, so they are checked against each other here rather
+      # than rewritten: bumping the version is a reviewed commit on main, not
+      # something CI does on its way past.
+      - name: Check the version agrees everywhere
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          case "$VERSION" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::$VERSION is not vMAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+          bare="${VERSION#v}"
+
+          pyproject=$(python3 - <<'PY'
+          import tomllib, pathlib
+          print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])
+          PY
+          )
+          info=$(python3 -c 'import json,pathlib; print(json.loads(pathlib.Path("georiva_plugin_info.json").read_text())["version"])')
+
+          fail=0
+          [ "$pyproject" = "$bare" ] || { echo "::error::pyproject.toml says $pyproject, not $bare"; fail=1; }
+          [ "$info" = "$bare" ] || { echo "::error::georiva_plugin_info.json says $info, not $bare"; fail=1; }
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::$VERSION already exists; a released tag is never moved — bump the version instead"
+            fail=1
+          fi
+          exit $fail
+
+      # Kept the same as ci.yml's NODE_VERSION, which workflow-level env cannot
+      # be shared with: a release should be built on the runtime CI tested on.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The same checks ci.yml runs, against the tree being released. They are
+      # cheap, and the alternative is tagging a bundle whose source never had
+      # them run in this order on this runner.
+      - name: Check the web source
+        working-directory: web
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+
+      # Builds into src/georiva_forecast_viewer/static/forecast_viewer/, which
+      # `npm run build` empties first, so nothing from a previous build can
+      # survive into the release.
+      - name: Build the bundle
+        working-directory: web
+        run: npm run build
+
+      - name: Commit the bundle and tag it
+        env:
+          VERSION: ${{ inputs.version }}
+          BUNDLE: src/georiva_forecast_viewer/static/forecast_viewer
+        run: |
+          set -euo pipefail
+          test -f "$BUNDLE/index.html" || { echo "::error::$BUNDLE/index.html is missing: the build produced nothing"; exit 1; }
+
+          # Detached, so the commit belongs to the tag and to nothing else; main
+          # is not touched and never carries the bundle.
+          git checkout --detach --quiet HEAD
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # -f because .gitignore keeps the build output out of a working tree:
+          # a developer running `npm run build` locally should not see it as a
+          # change to commit, and this is the one place it is meant to be
+          # committed. --no-verify has no hooks to skip here; it is left off so
+          # that a hook added later is not silently bypassed.
+          git add -f "$BUNDLE"
+          git diff --cached --quiet && { echo "::error::nothing staged: the bundle is already committed at this ref"; exit 1; }
+
+          source=$(git rev-parse --short HEAD)
+          printf '%s\n\n%s\n%s\n' \
+            "release $VERSION: the built web bundle" \
+            "Built from $source by .github/workflows/release.yml." \
+            "Not on main: see that file for why the bundle lives only on tags." \
+            | git commit --quiet -F -
+
+          git tag -a "$VERSION" -m "georiva-forecast-viewer $VERSION"
+
+          # Only the tag. The commit reaches the remote as the tag's target and
+          # no branch points at it.
+          git push origin "refs/tags/$VERSION"
+
+      # The page an operator lands on from the installer's manifest, carrying
+      # the two lines they need to install it.
+      # The page an operator lands on from a site's manifest. The notes are
+      # written here rather than left to --generate-notes, because what an
+      # operator needs from this page is the manifest entry, not a list of the
+      # pull requests that went into it — those are a click away on the tag.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          Install it by adding this to a site's \`deploy/plugins.toml\`:
+
+          \`\`\`toml
+          [[plugin]]
+          name = "georiva-forecast-viewer"
+          git = "https://github.com/wmo-raf/georiva-forecast-viewer.git"
+          tag = "$VERSION"
+          \`\`\`
+
+          The tag carries the built web bundle, so \`collectstatic\` serves the
+          viewer from \`/static/forecast_viewer/\` with no node on the server.
+          EOF
+          gh release create "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md"

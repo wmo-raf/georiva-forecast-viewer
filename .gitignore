@@ -9,6 +9,16 @@ dist/
 .vscode/
 
 # web/
-web/node_modules/
+# Unanchored, so it also catches the node_modules a tool leaves at the repo
+# root when it is run from there rather than from web/ — vitest writes its
+# cache into one, and sixteen of those files were committed once already.
+node_modules/
 web/dist/
 .env
+
+# The built web bundle. It is committed exactly once per release, on the
+# detached commit a tag points at, by .github/workflows/release.yml with
+# `git add -f` — never on main, where a minified bundle would make every diff
+# unreadable. Ignored here so that a local `npm run build`, which is how the
+# bundle is checked before it ships, leaves a clean working tree.
+src/georiva_forecast_viewer/static/forecast_viewer/
