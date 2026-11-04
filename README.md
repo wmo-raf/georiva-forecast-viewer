@@ -138,11 +138,16 @@ ships too. The release notes name the exact source commit for that reason.
 A site installs it through `deploy/plugins.toml`:
 
 ```toml
-[[plugin]]
+[[plugins]]
 name = "georiva-forecast-viewer"
 git = "https://github.com/wmo-raf/georiva-forecast-viewer.git"
 tag = "v0.2.0"
 ```
+
+The table header is `[[plugins]]`, plural. Core's `parse_plugins_toml.py` reads
+the `plugins` key and nothing else, and a manifest that spells it `[[plugin]]`
+parses fine, installs nothing and exits 0 — the failure is a viewer that never
+appears, with no error anywhere to say why.
 
 `collectstatic` then collects `static/forecast_viewer/` from the installed app
 and nginx serves the viewer from `/static/forecast_viewer/`.
