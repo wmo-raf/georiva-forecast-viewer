@@ -2,8 +2,10 @@
 /**
  * The timeline: one cell per day of the run, a playhead that sits inside the
  * cell at the step's hour, a floating label with the exact step, and play.
- * Playback advances only once the current frame is drawn, so a slow texture
- * stretches the frame rather than skipping it; textures load lazily per step.
+ * Playback advances only once the current frame is drawn — both of its
+ * textures, the raster and the wind — so a slow one stretches the frame rather
+ * than skipping it, and the wind never lags the colours. Textures load lazily
+ * per step.
  */
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-vue-next";
 import { computed, onBeforeUnmount, watch } from "vue";
@@ -11,7 +13,7 @@ import { cellOf, dayCells, progressWithin } from "../state/daystrip";
 import { useViewer } from "../state/store";
 
 const viewer = useViewer();
-const props = defineProps<{ textureReady: boolean }>();
+const props = defineProps<{ frameReady: boolean }>();
 
 const cells = computed(() => dayCells(viewer.times.value));
 const current = computed(() => cellOf(cells.value, viewer.state.step));
@@ -59,12 +61,12 @@ function scheduleNext() {
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = null;
-    if (viewer.state.playing && props.textureReady) viewer.step(+1);
+    if (viewer.state.playing && props.frameReady) viewer.step(+1);
   }, FRAME_MS);
 }
 
 watch(
-  () => [viewer.state.playing, props.textureReady, viewer.state.step] as const,
+  () => [viewer.state.playing, props.frameReady, viewer.state.step] as const,
   ([playing, ready]) => {
     if (playing && ready) scheduleNext();
     else if (timer) {

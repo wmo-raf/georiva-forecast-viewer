@@ -33,21 +33,24 @@ const LAYER_ID = "forecast-raster";
 const WIND_LAYER_ID = "forecast-wind";
 
 /**
- * White trails over the raster, long enough to read a direction at a glance
- * without hiding the colours underneath. `speedFactor` is relative to the
- * zoom, so one value reads the same whether the view is a continent or a
- * country.
+ * How the trails look: white over the raster, long enough to read a direction
+ * at a glance without hiding the colours underneath. `speedFactor` is applied
+ * relative to the zoom, so one value reads the same whether the view is a
+ * continent or a country. Tuned by eye against both models.
  */
-const WIND_COLOR: [number, number, number, number] = [255, 255, 255, 230];
-const WIND_WIDTH = 1.4;
-const WIND_MAX_AGE = 25;
-const WIND_SPEED_FACTOR = 25;
-const WIND_OPACITY = 0.85;
+const WIND = {
+  color: [255, 255, 255, 230] as [number, number, number, number],
+  width: 1.4,
+  maxAge: 25,
+  speedFactor: 25,
+  opacity: 0.85,
+};
 
 const props = defineProps<{ config: ViewerConfig }>();
 const emit = defineEmits<{
-  textureReady: [ready: boolean];
-  textureError: [message: string | null];
+  /** Both textures of the current step have settled — the frame is as drawn as it will get. */
+  frameReady: [ready: boolean];
+  rasterError: [message: string | null];
   windError: [message: string | null];
 }>();
 
@@ -66,7 +69,10 @@ interface Slot {
   error: Ref<string | null>;
 }
 
-const newSlot = (): Slot => ({ texture: shallowRef(null), pending: ref(false), error: ref(null) });
+function newSlot(): Slot {
+  return { texture: shallowRef(null), pending: ref(false), error: ref(null) };
+}
+
 const raster = newSlot();
 const wind = newSlot();
 
@@ -86,11 +92,11 @@ function windLayers() {
       // R unscales to u and G to v, so the integrated direction is the source's.
       imageUnscale: current.unscale,
       numParticles: particleCount(current.bounds, viewport.value),
-      maxAge: WIND_MAX_AGE,
-      speedFactor: WIND_SPEED_FACTOR,
-      width: WIND_WIDTH,
-      color: WIND_COLOR,
-      opacity: WIND_OPACITY,
+      maxAge: WIND.maxAge,
+      speedFactor: WIND.speedFactor,
+      width: WIND.width,
+      color: WIND.color,
+      opacity: WIND.opacity,
       animate: true,
     }),
   ];
@@ -160,8 +166,8 @@ follow(viewer.textureUrl, raster);
 follow(viewer.windTextureUrl, wind);
 
 const ready = computed(() => !raster.pending.value && !wind.pending.value);
-watch(ready, (value) => emit("textureReady", value), { immediate: true });
-watch(raster.error, (message) => emit("textureError", message), { immediate: true });
+watch(ready, (value) => emit("frameReady", value), { immediate: true });
+watch(raster.error, (message) => emit("rasterError", message), { immediate: true });
 watch(wind.error, (message) => emit("windError", message), { immediate: true });
 
 watch(() => viewer.parameter.value, repaint);

@@ -43,9 +43,27 @@ async function decodePng(blob: Blob): Promise<TextureData> {
   }
 }
 
+/**
+ * What the tile server said went wrong, when it said anything.
+ *
+ * A refusal here carries a sentence worth reading — a vector pair whose two
+ * components turn out to be on different grids answers 422 and explains that
+ * (ADR 0021's amendment), and that is the one failure the contract predicts.
+ * A bare status code would throw the explanation away.
+ */
+async function refusal(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    if (typeof body?.detail === "string") return body.detail;
+  } catch {
+    // Not JSON, or an empty body: the status is all there is to report.
+  }
+  return `${response.status} ${response.statusText}`.trim();
+}
+
 export async function loadTexture(url: string): Promise<Texture> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`${response.status} from ${url}`);
+  if (!response.ok) throw new Error(await refusal(response));
   const bounds = numbers(response.headers.get("X-Image-Bounds"), 4, "X-Image-Bounds");
   const unscale = numbers(response.headers.get("X-Image-Unscale"), 2, "X-Image-Unscale");
   const image = await decodePng(await response.blob());

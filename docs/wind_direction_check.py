@@ -17,6 +17,13 @@ Run it inside the tile server, which can reach both the COGs and its own route:
 It exits non-zero on any mismatch. The sample points, times and runs below are
 the ones `docs/wind-direction-check.md` records a result for; edit them to
 re-run against whatever data a stack happens to hold.
+
+This is a developer check, not part of the app: `web/` reaches GeoRiva over
+public HTTP routes only (core's ADR 0036), while this reads the tile server's
+own modules from inside its container, and spells the route by hand rather
+than through core's `addresses.py` (ADR 0013) — which is the point, since
+checking the texture means asking for it the way a client does, and Django is
+not here to ask. Nothing in the shipped bundle may do either.
 """
 
 import sys

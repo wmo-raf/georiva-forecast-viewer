@@ -27,7 +27,17 @@ export type Bounds = [number, number, number, number];
 /** Particles for a grid that fills the view; WeatherLayers' own default. */
 export const BASE_PARTICLES = 5000;
 
-/** The most the budget is multiplied by, so a tiny domain cannot ask for millions. */
+/**
+ * The most the budget is multiplied by, so a tiny domain cannot ask for
+ * millions of particles the GPU then throws away.
+ *
+ * The cap bites before parity does: a 10° domain seen on a world view covers
+ * well under a hundredth of it, and eight times the budget does not make that
+ * back. It does not need to — a trail is about as long in pixels at any zoom,
+ * so a domain that small is only a few trails wide and reads as dense already.
+ * Parity matters at the zooms the domain is actually looked at, and there the
+ * boost reaches it.
+ */
 export const MAX_BOOST = 8;
 
 const WORLD_LONGITUDES = 360;
@@ -72,10 +82,10 @@ export function visibleFraction(data: Bounds, viewport: Bounds): number {
  * count, as does data entirely off screen, where every particle would be
  * dropped anyway and a boost would only cost GPU memory.
  */
-export function particleCount(data: Bounds | null, viewport: Bounds | null, base = BASE_PARTICLES): number {
-  if (!data || !viewport) return base;
+export function particleCount(data: Bounds | null, viewport: Bounds | null): number {
+  if (!data || !viewport) return BASE_PARTICLES;
   const fraction = visibleFraction(data, viewport);
-  if (fraction <= 0) return base;
+  if (fraction <= 0) return BASE_PARTICLES;
   const steps = Math.min(Math.max(Math.round(Math.log2(1 / fraction)), 0), Math.log2(MAX_BOOST));
-  return base * 2 ** steps;
+  return BASE_PARTICLES * 2 ** steps;
 }

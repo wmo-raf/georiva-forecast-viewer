@@ -41,7 +41,10 @@ differs from a global one: WeatherLayers seeds particles across the *viewport*
 and discards every one outside the layer's bounds, so a WRF domain covering a
 tenth of the view would draw a tenth of the particles IFS does. The budget is
 scaled by the share of the view the data covers, in powers of two so that
-panning does not reallocate the layer's buffers and restart every trail.
+panning does not reallocate the layer's buffers and restart every trail. The
+boost is capped, which bites only on a world view of a small domain — where a
+trail is already several times the domain's width and the particles read as
+dense regardless.
 
 ## Layout
 

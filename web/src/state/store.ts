@@ -119,7 +119,11 @@ const textureUrl = computed(() => {
 const windTextureUrl = computed(() => {
   const org = state.catalogue?.config.org;
   const wind = windToDraw.value;
-  if (!org || !wind || !time.value || !run.value) return null;
+  // Both components, explicitly: the admin cannot save a vector binding with
+  // one of them missing, but a catalogue that somehow carried one would throw
+  // out of this computed and take the map down with it. No wind is the honest
+  // answer to half a pair.
+  if (!org || !wind?.u || !wind.v || !time.value || !run.value) return null;
   return vectorPreviewUrl(org, wind, time.value, run.value.reference_time);
 });
 
