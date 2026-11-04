@@ -21,6 +21,21 @@ the current frame before advancing. The texture's own `X-Image-Bounds` and
 `X-Image-Unscale` headers are what the layer is drawn with, since display
 clipping (ADR 0038) can crop the image narrower than the collection's extent.
 
+## Layout
+
+- Left rail (`Rail.vue`): the organisation's name, the scalar quantities with
+  their icons (`ui/icons.ts`, the web's half of the plugin's `icons.json`),
+  and the wind toggle. The map draws a fixed pair: the selected scalar
+  quantity plus wind from the same model and run, when that model has a
+  wind binding.
+- "Select model" (`ModelPanel.vue`), bottom right: the models bound to the
+  selected quantity, each with its descriptor, and the run inside the same
+  panel.
+- Day strip (`DayStrip.vue`, `state/daystrip.ts`): one cell per UTC day of
+  the run, the playhead at the step's hour of day, a floating label with the
+  exact step, play and step buttons.
+- Legend (`Legend.vue`): the palette as a bar with stop values and the unit.
+
 ## Development
 
 ```

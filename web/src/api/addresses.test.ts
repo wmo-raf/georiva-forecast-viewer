@@ -7,6 +7,7 @@ const source = {
   catalog: "models",
   collection: "ecmwf-ifs",
   variable: "t2m",
+  descriptor: "",
   version: "ab12cd34",
 };
 

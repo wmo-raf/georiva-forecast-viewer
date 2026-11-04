@@ -17,7 +17,8 @@ import type { ViewerConfig } from "../api/types";
 import { loadTexture, type Texture } from "../map/texture";
 import { useViewer } from "../state/store";
 
-const DEFAULT_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+/** A muted dark basemap so the data colours carry the picture; the settings model can replace it. */
+const DEFAULT_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const LAYER_ID = "forecast-raster";
 
 const props = defineProps<{ config: ViewerConfig }>();

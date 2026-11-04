@@ -44,6 +44,7 @@ class QuantityViewSet(OrgScopedViewSetMixin, SnippetViewSet):
         FieldPanel("name"),
         FieldPanel("slug"),
         FieldPanel("kind"),
+        FieldPanel("icon"),
         FieldPanel("order"),
     ]
 
@@ -89,6 +90,7 @@ class ForecastSourceViewSet(OrgScopedViewSetMixin, SnippetViewSet):
                 [
                     FieldPanel("collection"),
                     FieldPanel("name"),
+                    FieldPanel("descriptor"),
                     FieldPanel("slug"),
                     FieldPanel("order"),
                 ],

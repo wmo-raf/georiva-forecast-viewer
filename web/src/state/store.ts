@@ -30,6 +30,8 @@ interface State {
   edr: EdrCollection | null;
   step: number;
   playing: boolean;
+  /** The wind toggle; drawn only when the selected source has a wind binding. */
+  windOn: boolean;
 }
 
 const state = reactive<State>({
@@ -43,14 +45,40 @@ const state = reactive<State>({
   edr: null,
   step: 0,
   playing: false,
+  windOn: true,
 });
 
 /** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
 const keyOf = (source: Source) => `${source.catalog}/${source.collection}`;
 
-const source = computed<Source | undefined>(() =>
-  state.catalogue && state.selection ? sourceOf(state.catalogue, state.selection) : undefined,
+/**
+ * The map shows a fixed pair: one scalar quantity as the raster, plus wind.
+ * So the list a user picks from is the scalar quantities, and the selection
+ * rules run over that view of the catalogue.
+ */
+const scalarView = computed<Catalogue | null>(() =>
+  state.catalogue
+    ? { ...state.catalogue, quantities: state.catalogue.quantities.filter((q) => q.kind === "scalar") }
+    : null,
 );
+
+const scalarQuantities = computed(() => scalarView.value?.quantities ?? []);
+
+const source = computed<Source | undefined>(() =>
+  scalarView.value && state.selection ? sourceOf(scalarView.value, state.selection) : undefined,
+);
+
+/** The selected source's wind binding, if the catalogue has a vector quantity bound to it. */
+const windBinding = computed<Source | null>(() => {
+  const slug = state.selection?.source;
+  if (!slug || !state.catalogue) return null;
+  for (const quantity of state.catalogue.quantities) {
+    if (quantity.kind !== "vector") continue;
+    const bound = quantity.sources.find((s) => s.slug === slug);
+    if (bound) return bound;
+  }
+  return null;
+});
 
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
@@ -81,7 +109,7 @@ async function load() {
   state.status = "loading";
   try {
     state.catalogue = await loadCatalogue();
-    state.selection = initialSelection(state.catalogue);
+    state.selection = scalarView.value ? initialSelection(scalarView.value) : null;
     state.status = state.selection ? "ready" : "empty";
   } catch (error) {
     state.status = "error";
@@ -120,11 +148,15 @@ watch(
 );
 
 function pickQuantity(slug: string) {
-  if (state.catalogue && state.selection) state.selection = selectQuantity(state.catalogue, state.selection, slug);
+  if (scalarView.value && state.selection) state.selection = selectQuantity(scalarView.value, state.selection, slug);
 }
 
 function pickSource(slug: string) {
-  if (state.catalogue && state.selection) state.selection = selectSource(state.catalogue, state.selection, slug);
+  if (scalarView.value && state.selection) state.selection = selectSource(scalarView.value, state.selection, slug);
+}
+
+function setWind(on: boolean) {
+  state.windOn = on;
 }
 
 function pickRun(referenceTime: string) {
@@ -150,7 +182,10 @@ export function useViewer() {
   return {
     // Shared by reference; components read it and change it only through the actions below.
     state,
+    scalarQuantities,
+    scalarView,
     source,
+    windBinding,
     run,
     times,
     time,
@@ -164,5 +199,6 @@ export function useViewer() {
     step,
     setStep,
     setPlaying,
+    setWind,
   };
 }

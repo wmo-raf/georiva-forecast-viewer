@@ -42,6 +42,7 @@ class CatalogueTests(TestCase):
                     "slug": "t2m",
                     "name": "2 m temperature",
                     "kind": "scalar",
+                    "icon": "",
                     "sources": [
                         {
                             "slug": "ifs",
@@ -49,6 +50,7 @@ class CatalogueTests(TestCase):
                             "catalog": "models",
                             "collection": "ecmwf-ifs",
                             "variable": "t2m",
+                            "descriptor": "",
                             "version": ANY,
                         },
                         {
@@ -57,12 +59,30 @@ class CatalogueTests(TestCase):
                             "catalog": "models",
                             "collection": "wrf-3km",
                             "variable": "t2",
+                            "descriptor": "",
                             "version": ANY,
                         },
                     ],
                 }
             ],
         )
+
+    def test_a_quantity_carries_its_icon_and_a_source_its_descriptor(self):
+        temperature = make_quantity("t2m", icon="thermometer")
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs", descriptor="9 km")
+        bind(ifs, temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["icon"], "thermometer")
+        self.assertEqual(quantity["sources"][0]["descriptor"], "9 km")
+
+    def test_an_unset_icon_and_descriptor_are_blank_strings(self):
+        temperature = make_quantity("t2m")
+        bind(make_source(make_collection("ecmwf-ifs"), slug="ifs"), temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["icon"], "")
+        self.assertEqual(quantity["sources"][0]["descriptor"], "")
 
     def test_each_source_carries_the_render_config_token_its_texture_urls_need(self):
         """The texture reply is immutable for a year, so the URL must change when the range does (ADR 0021)."""
@@ -143,6 +163,7 @@ class CatalogueVisibilityTests(TestCase):
     def test_an_unconfigured_organisation_answers_its_config_and_no_quantities(self):
         body = self.client.get(reverse(URL)).json()
         self.assertEqual(body["config"]["org"], DEFAULT_TEST_ORG_SLUG)
+        self.assertEqual(body["config"]["org_name"], DEFAULT_TEST_ORG_SLUG)
         self.assertEqual(body["config"]["basemap_style"], None)
         self.assertEqual(body["config"]["default_view"], {"center": [20.0, 0.0], "zoom": 3.0})
         self.assertEqual(body["quantities"], [])

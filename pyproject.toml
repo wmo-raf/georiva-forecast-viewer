@@ -28,4 +28,4 @@ where = ["src"]
 # and ships inside the wheel: the plugin installer (core's ADR 0035) has no
 # node and runs no hooks, so what is in git at the tag is what a server gets.
 [tool.setuptools.package-data]
-georiva_forecast_viewer = ["static/**/*"]
+georiva_forecast_viewer = ["static/**/*", "icons.json"]

@@ -28,9 +28,10 @@ GeoRiva's process and talks to it over public HTTP routes only.
 ## What the operator declares
 
 - **Quantity** — the shared thing a user picks: "2 m temperature", "10 m wind".
-  Scalar (one variable) or vector (a u/v pair). Per organisation.
-- **Source** — one model the viewer can show: one collection, with a name and
-  an order. Owned through its collection.
+  Scalar (one variable) or vector (a u/v pair), with an icon from the curated
+  set in `icons.json`. Per organisation.
+- **Source** — one model the viewer can show: one collection, with a name, a
+  short descriptor ("9 km") and an order. Owned through its collection.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.

@@ -26,6 +26,8 @@ from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 
 from georiva.organisations.access import organisation_of
 
+from .icons import ICON_CHOICES
+
 #: The three fields a binding may name a variable in.
 VARIABLE_FIELDS = ("variable", "u_variable", "v_variable")
 
@@ -53,6 +55,13 @@ class Quantity(models.Model):
     )
     name = models.CharField(max_length=100, help_text="Shown to users, e.g. '2 m temperature'.")
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.SCALAR)
+    icon = models.CharField(
+        max_length=40,
+        choices=ICON_CHOICES,
+        blank=True,
+        default="",
+        help_text="The glyph beside the name in the viewer's list.",
+    )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")
 
     class Meta:
@@ -95,6 +104,12 @@ class ForecastSource(ClusterableModel):
         help_text="Stable identifier the viewer uses, e.g. 'ifs' or 'wrf'.",
     )
     name = models.CharField(max_length=100, help_text="Shown to users, e.g. 'ECMWF IFS'.")
+    descriptor = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="A short tag shown beside the name, e.g. '9 km' or 'global'.",
+    )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")
 
     class Meta:

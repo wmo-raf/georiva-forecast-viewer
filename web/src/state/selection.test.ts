@@ -2,23 +2,24 @@ import { describe, expect, it } from "vitest";
 import type { Catalogue } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourcesFor } from "./selection";
 
-const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs", version: "v1" };
-const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2" };
+const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs", version: "v1", descriptor: "" };
+const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2", descriptor: "" };
 
 const catalogue: Catalogue = {
-  config: { org: "kmd", basemap_style: null, default_view: { center: [20, 0], zoom: 3 } },
+  config: { org: "kmd", org_name: "KMD", basemap_style: null, default_view: { center: [20, 0], zoom: 3 } },
   quantities: [
     {
       slug: "t2m",
       name: "2 m temperature",
       kind: "scalar",
+      icon: "",
       sources: [
         { ...ifs, variable: "t2m" },
         { ...wrf, variable: "t2" },
       ],
     },
-    { slug: "rh", name: "Humidity", kind: "scalar", sources: [{ ...ifs, variable: "r2" }] },
-    { slug: "wind10", name: "10 m wind", kind: "vector", sources: [{ ...wrf, u: "u10", v: "v10" }] },
+    { slug: "rh", name: "Humidity", kind: "scalar", icon: "", sources: [{ ...ifs, variable: "r2" }] },
+    { slug: "wind10", name: "10 m wind", kind: "vector", icon: "wind", sources: [{ ...wrf, u: "u10", v: "v10" }] },
   ],
 };
 

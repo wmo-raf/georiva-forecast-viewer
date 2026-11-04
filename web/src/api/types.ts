@@ -8,6 +8,7 @@ export interface Catalogue {
 
 export interface ViewerConfig {
   org: string;
+  org_name: string;
   basemap_style: string | null;
   default_view: { center: [number, number]; zoom: number };
 }
@@ -18,6 +19,8 @@ export interface Quantity {
   slug: string;
   name: string;
   kind: QuantityKind;
+  /** A name from the plugin's curated set, or blank. */
+  icon: string;
   sources: Source[];
 }
 
@@ -25,6 +28,8 @@ export interface Quantity {
 export interface Source {
   slug: string;
   name: string;
+  /** A short tag beside the name, e.g. "9 km"; may be blank. */
+  descriptor: string;
   catalog: string;
   collection: string;
   variable?: string;

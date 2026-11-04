@@ -28,6 +28,7 @@ def describe_config(organisation):
     settings = ForecastViewerSettings.for_site(organisation.site)
     return {
         "org": organisation.slug,
+        "org_name": organisation.name,
         "basemap_style": settings.basemap_style_url or None,
         "default_view": {
             "center": [settings.default_longitude, settings.default_latitude],
@@ -54,6 +55,7 @@ def describe_source(binding):
     described = {
         "slug": source.slug,
         "name": source.name,
+        "descriptor": source.descriptor,
         "catalog": source.collection.catalog.slug,
         "collection": source.collection.slug,
     }
@@ -80,7 +82,7 @@ def describe_quantities(request):
         quantity = binding.quantity
         entry = by_quantity.setdefault(
             quantity.pk,
-            {"slug": quantity.slug, "name": quantity.name, "kind": quantity.kind, "sources": []},
+            {"slug": quantity.slug, "name": quantity.name, "kind": quantity.kind, "icon": quantity.icon, "sources": []},
         )
         entry["sources"].append(describe_source(binding))
     return list(by_quantity.values())
