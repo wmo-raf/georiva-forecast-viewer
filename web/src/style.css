@@ -64,6 +64,15 @@ button {
   color: var(--fv-error);
 }
 
+/* One line per failure, stacked tightly: several can stand at once. */
+.notice p {
+  margin: 0;
+}
+
+.notice p + p {
+  margin-top: 4px;
+}
+
 /* Beside the rail rather than over it, under the zoom controls. */
 .notice--floating {
   top: 16px;

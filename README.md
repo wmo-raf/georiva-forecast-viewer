@@ -14,6 +14,7 @@ GET /api/forecast-viewer/     # the quantities and sources this caller may see, 
 ```
 georiva-forecast-viewer/
 ├── pyproject.toml
+├── docs/                          # notes on checks that need a running stack
 ├── src/georiva_forecast_viewer/   # the plugin: models, admin, the catalogue route
 │   └── static/forecast_viewer/    # the built web bundle, committed on release
 └── web/                           # the user interface source (Vite + Vue 3 + TypeScript)

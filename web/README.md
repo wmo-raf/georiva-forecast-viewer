@@ -13,6 +13,7 @@ into `../src/georiva_forecast_viewer/static/forecast_viewer/` on release, where
 | Which runs are complete, which is latest | `GET /api/runs/<catalog>/<collection>/` |
 | Each run's valid times, palette, unit, unscale range | `GET /api/edr/collections/<collection>/` |
 | One step's value-encoded texture | `GET /titiler/<org>/<catalog>/<collection>/<variable>/encoded-preview.png?time=&reftime=` |
+| One step's wind pair, as two bands | `GET /titiler/<org>/<catalog>/<collection>/vector-preview.png?u_variable=&v_variable=&time=&reftime=` |
 
 The quantity is the primary selection; the source list is the sources bound to
 it (`src/state/selection.ts`). Only complete runs are offered, latest first
@@ -21,13 +22,36 @@ the current frame before advancing. The texture's own `X-Image-Bounds` and
 `X-Image-Unscale` headers are what the layer is drawn with, since display
 clipping (ADR 0038) can crop the image narrower than the collection's extent.
 
+## Wind
+
+The scalar raster and the wind particles are a fixed pair: the same model, run
+and step, from two textures loaded independently (`MapView.vue`). A step counts
+as drawn only when both have settled, so playback never runs ahead of the wind.
+
+The wind texture is two bands over one shared range, so the decoded `atan2` is
+the direction in the source data. That is checked against the COGs rather than
+by eye — a mirrored or transposed field still looks like weather — and the
+result is recorded in [`../docs/wind-direction-check.md`](../docs/wind-direction-check.md),
+with the script that produces it beside it. The note also says what the
+components' configured range costs in direction precision, which is the one
+thing an operator can get wrong here.
+
+`map/particles.ts` sizes the particle budget, which is where a regional model
+differs from a global one: WeatherLayers seeds particles across the *viewport*
+and discards every one outside the layer's bounds, so a WRF domain covering a
+tenth of the view would draw a tenth of the particles IFS does. The budget is
+scaled by the share of the view the data covers, in powers of two so that
+panning does not reallocate the layer's buffers and restart every trail. The
+boost is capped, which bites only on a world view of a small domain — where a
+trail is already several times the domain's width and the particles read as
+dense regardless.
+
 ## Layout
 
 - Left rail (`Rail.vue`): the organisation's name, the scalar quantities with
   their icons (`ui/icons.ts`, the web's half of the plugin's `icons.json`),
-  and the wind toggle. The map draws a fixed pair: the selected scalar
-  quantity plus wind from the same model and run, when that model has a
-  wind binding.
+  and the wind toggle — which is off and disabled for a model with no wind
+  binding.
 - "Select model" (`ModelPanel.vue`), bottom right: the models bound to the
   selected quantity, each with its descriptor, and the run inside the same
   panel.

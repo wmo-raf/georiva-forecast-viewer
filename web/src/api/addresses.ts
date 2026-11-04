@@ -25,6 +25,28 @@ export function edrCollectionUrl(source: Source): string {
 }
 
 /**
+ * What every texture URL carries beyond its path: which step, and the token
+ * that keys the reply.
+ *
+ * In one place because the two are a pair. A texture reply is immutable for a
+ * year, so a URL that named a step without its render-config token would be
+ * cached against a range it no longer matches (ADR 0021) — and the two
+ * addresses below must never drift on that. `leading` goes first so each
+ * address keeps the parameter order core's `addresses.py` writes.
+ */
+function stepParams(
+  source: Source,
+  time: string,
+  reftime: string | null,
+  leading: Record<string, string> = {},
+): URLSearchParams {
+  const params = new URLSearchParams({ ...leading, time });
+  if (reftime) params.set("reftime", reftime);
+  params.set("v", source.version);
+  return params;
+}
+
+/**
  * The value-encoded texture of one variable at one step (ADR 0021), carrying
  * the source's `version` as `v=` so the immutable reply is keyed by render config.
  */
@@ -35,8 +57,23 @@ export function encodedPreviewUrl(
   time: string,
   reftime: string | null,
 ): string {
-  const params = new URLSearchParams({ time });
-  if (reftime) params.set("reftime", reftime);
-  params.set("v", source.version);
+  const params = stepParams(source, time, reftime);
   return `/titiler/${org}/${source.catalog}/${source.collection}/${variable}/encoded-preview.png?${params}`;
+}
+
+/**
+ * The two-band (u, v) texture of one step, for the particle layer (core's #593).
+ *
+ * Addressed on the *collection*, with the pair named in the query, because the
+ * nginx gate decides visibility per collection and one decision has to cover
+ * both components (ADR 0021's amendment). `version` is the pair's own token,
+ * which the plugin mints from both ranges: the two bands are encoded over the
+ * union of them, so an edit to either moves every pixel of both.
+ */
+export function vectorPreviewUrl(org: string, source: Source, time: string, reftime: string | null): string {
+  if (!source.u || !source.v) {
+    throw new Error(`${source.slug} has no u and v pair to build a vector texture from`);
+  }
+  const params = stepParams(source, time, reftime, { u_variable: source.u, v_variable: source.v });
+  return `/titiler/${org}/${source.catalog}/${source.collection}/vector-preview.png?${params}`;
 }
