@@ -38,7 +38,7 @@ export function cellOf(cells: DayCell[], step: number): DayCell | undefined {
 }
 
 /** Where in its day a step falls, 0 at midnight to just under 1 at the end of the day. */
-export function progressWithin(_cell: DayCell, times: string[], step: number): number {
+export function progressWithin(times: string[], step: number): number {
   const date = new Date(times[step]);
   return (date.getUTCHours() * 60 + date.getUTCMinutes()) / (24 * 60);
 }

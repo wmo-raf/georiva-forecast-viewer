@@ -31,10 +31,9 @@ describe("the day strip groups a run's steps by UTC day", () => {
   });
 
   it("places the playhead within a cell by the step's hour of day", () => {
-    const cells = dayCells(times);
-    expect(progressWithin(cells[0], times, 0)).toBeCloseTo(0.5);
-    expect(progressWithin(cells[0], times, 3)).toBeCloseTo(0.875);
-    expect(progressWithin(cells[1], times, 4)).toBe(0);
+    expect(progressWithin(times, 0)).toBeCloseTo(0.5);
+    expect(progressWithin(times, 3)).toBeCloseTo(0.875);
+    expect(progressWithin(times, 4)).toBe(0);
   });
 
   it("has no cells for an empty run", () => {

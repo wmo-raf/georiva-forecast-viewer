@@ -64,6 +64,14 @@ button {
   color: var(--fv-error);
 }
 
+/* Beside the rail rather than over it, under the zoom controls. */
+.notice--floating {
+  top: 16px;
+  left: auto;
+  right: 64px;
+  transform: none;
+}
+
 /* ---- left rail ---- */
 
 .rail {
@@ -163,7 +171,8 @@ button {
   bottom: 118px;
   z-index: 4;
   display: flex;
-  flex-direction: column;
+  /* The toggle comes first in the DOM, so Tab reaches it before the options it opens; drawn above them. */
+  flex-direction: column-reverse;
   align-items: flex-end;
   gap: 8px;
 }
@@ -298,10 +307,24 @@ button {
 }
 
 .legend__ticks {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 14px;
   font-size: 11px;
   color: var(--fv-muted);
+}
+
+/* Each tick sits under the colour it names; the ends stay inside the bar. */
+.legend__tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.legend__tick:first-child {
+  transform: none;
+}
+
+.legend__tick:last-child {
+  transform: translateX(-100%);
 }
 
 /* ---- bottom strip ---- */

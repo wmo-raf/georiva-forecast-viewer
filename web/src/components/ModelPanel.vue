@@ -33,8 +33,16 @@ function pick(slug: string) {
 </script>
 
 <template>
-  <div class="model" :class="{ 'model--open': open }">
-    <div v-if="open" class="model__panel">
+  <div class="model" :class="{ 'model--open': open }" @keydown.escape="open = false">
+    <button type="button" class="model__toggle" :aria-expanded="open" aria-controls="model-panel" @click="open = !open">
+      <span class="model__eyebrow">Select model</span>
+      <span class="model__current">
+        <span class="model__name">{{ viewer.source.value?.name ?? "—" }}</span>
+        <span v-if="viewer.source.value?.descriptor" class="model__descriptor">{{ viewer.source.value.descriptor }}</span>
+        <ChevronUp class="model__chevron" :size="16" aria-hidden="true" />
+      </span>
+    </button>
+    <div v-if="open" id="model-panel" class="model__panel">
       <div class="model__heading">Model</div>
       <button
         v-for="s in sources"
@@ -59,13 +67,5 @@ function pick(slug: string) {
       </select>
       <div v-else-if="viewer.state.timeline" class="model__note">No complete run yet.</div>
     </div>
-    <button type="button" class="model__toggle" :aria-expanded="open" @click="open = !open">
-      <span class="model__eyebrow">Select model</span>
-      <span class="model__current">
-        <span class="model__name">{{ viewer.source.value?.name ?? "—" }}</span>
-        <span v-if="viewer.source.value?.descriptor" class="model__descriptor">{{ viewer.source.value.descriptor }}</span>
-        <ChevronUp class="model__chevron" :size="16" aria-hidden="true" />
-      </span>
-    </button>
   </div>
 </template>

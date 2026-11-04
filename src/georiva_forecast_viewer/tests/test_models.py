@@ -79,6 +79,21 @@ class BindingValidationTests(TestCase):
         self.assertEqual(list(caught.exception.message_dict), ["variable"])
 
 
+class QuantityIconTests(TestCase):
+    """The icon is one of the curated names in icons.json, or blank."""
+
+    def test_a_curated_name_is_accepted(self):
+        make_quantity("t2m", icon="thermometer").full_clean()
+
+    def test_blank_is_accepted(self):
+        make_quantity("t2m").full_clean()
+
+    def test_an_unknown_name_is_refused(self):
+        with self.assertRaises(ValidationError) as caught:
+            make_quantity("t2m", icon="not-a-glyph").full_clean()
+        self.assertIn("icon", caught.exception.message_dict)
+
+
 class QuantityKindTests(TestCase):
     """A quantity's kind is fixed once bound: its bindings are shaped by it."""
 

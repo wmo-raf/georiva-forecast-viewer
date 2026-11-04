@@ -26,7 +26,7 @@ from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 
 from georiva.organisations.access import organisation_of
 
-from .icons import ICON_CHOICES
+from .icons import validate_icon
 
 #: The three fields a binding may name a variable in.
 VARIABLE_FIELDS = ("variable", "u_variable", "v_variable")
@@ -57,9 +57,9 @@ class Quantity(models.Model):
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.SCALAR)
     icon = models.CharField(
         max_length=40,
-        choices=ICON_CHOICES,
         blank=True,
         default="",
+        validators=[validate_icon],
         help_text="The glyph beside the name in the viewer's list.",
     )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")

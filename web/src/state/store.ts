@@ -159,6 +159,9 @@ function setWind(on: boolean) {
   state.windOn = on;
 }
 
+/** The wind binding the map should draw: the toggle is on and the source has one. Null otherwise. */
+const windToDraw = computed<Source | null>(() => (state.windOn ? windBinding.value : null));
+
 function pickRun(referenceTime: string) {
   if (state.timeline?.runs.some((r) => r.reference_time === referenceTime)) {
     state.timeline.selected = referenceTime;
@@ -186,6 +189,7 @@ export function useViewer() {
     scalarView,
     source,
     windBinding,
+    windToDraw,
     run,
     times,
     time,

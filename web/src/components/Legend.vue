@@ -25,12 +25,15 @@ const gradient = computed(() => {
   return `linear-gradient(to right, ${parts.join(", ")})`;
 });
 
-/** About six evenly spaced stop values, read from the palette itself. */
+/** About six of the palette's own stops, each placed under the colour it names. */
 const ticks = computed(() => {
   const stops = palette.value;
-  if (!stops || stops.length === 0) return [];
+  const r = range.value;
+  if (!stops || !r || r.max === r.min) return [];
   const every = Math.max(1, Math.round((stops.length - 1) / 5));
-  return stops.filter((_, i) => i % every === 0 || i === stops.length - 1).map(([v]) => v);
+  return stops
+    .filter((_, i) => i % every === 0 || i === stops.length - 1)
+    .map(([value]) => ({ value, at: ((value - r.min) / (r.max - r.min)) * 100 }));
 });
 
 function format(value: number): string {
@@ -43,7 +46,9 @@ function format(value: number): string {
     <span class="legend__unit">{{ unit }}</span>
     <div class="legend__bar" :style="{ background: gradient }"></div>
     <div class="legend__ticks">
-      <span v-for="t in ticks" :key="t">{{ format(t) }}</span>
+      <span v-for="t in ticks" :key="t.value" class="legend__tick" :style="{ left: `${t.at}%` }">
+        {{ format(t.value) }}
+      </span>
     </div>
   </div>
 </template>

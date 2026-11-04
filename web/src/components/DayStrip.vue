@@ -21,8 +21,11 @@ const playhead = computed(() => {
   const cell = current.value;
   if (!cell || cells.value.length === 0) return 0;
   const index = cells.value.indexOf(cell);
-  return (index + progressWithin(cell, viewer.times.value, viewer.state.step)) / cells.value.length;
+  return (index + progressWithin(viewer.times.value, viewer.state.step)) / cells.value.length;
 });
+
+/** The label follows the playhead but stays clear of the strip's ends. */
+const labelLeft = computed(() => Math.min(0.93, Math.max(0.07, playhead.value)));
 
 const label = computed(() => {
   const iso = viewer.time.value;
@@ -40,7 +43,7 @@ function pickInCell(cellIndex: number, event: MouseEvent) {
   let best = cell.steps[0];
   let distance = Infinity;
   for (const step of cell.steps) {
-    const d = Math.abs(progressWithin(cell, viewer.times.value, step) - fraction);
+    const d = Math.abs(progressWithin(viewer.times.value, step) - fraction);
     if (d < distance) {
       distance = d;
       best = step;
@@ -95,7 +98,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div class="strip__days">
-      <div class="strip__label" :style="{ left: `${playhead * 100}%` }">{{ label }}</div>
+      <div class="strip__label" :style="{ left: `${labelLeft * 100}%` }" aria-live="polite">{{ label }}</div>
       <button
         v-for="(cell, i) in cells"
         :key="cell.key"

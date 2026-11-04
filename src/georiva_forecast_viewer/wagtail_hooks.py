@@ -15,6 +15,7 @@ The settings page is Wagtail's own, registered beside the model: a
 ``BaseSiteSetting`` is per Site, and the Site is the organisation.
 """
 
+from django import forms
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, ObjectList
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import CreateView, EditView, SnippetViewSet, SnippetViewSetGroup
@@ -23,6 +24,7 @@ from georiva.organisations.access import require_active_org
 from georiva.organisations.scoping import OrgScopedViewSetMixin
 
 from .forms import ForecastSourceForm
+from .icons import ICON_CHOICES
 from .models import VARIABLE_FIELDS, ForecastSource, Quantity
 
 
@@ -44,7 +46,9 @@ class QuantityViewSet(OrgScopedViewSetMixin, SnippetViewSet):
         FieldPanel("name"),
         FieldPanel("slug"),
         FieldPanel("kind"),
-        FieldPanel("icon"),
+        # A dropdown over the curated set; the list is the widget's, not the
+        # field's, so a new glyph in icons.json needs no migration.
+        FieldPanel("icon", widget=forms.Select(choices=ICON_CHOICES)),
         FieldPanel("order"),
     ]
 

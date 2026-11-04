@@ -31,10 +31,19 @@ let map: maplibregl.Map | null = null;
 let overlay: MapboxOverlay | null = null;
 let labelsLayerId: string | undefined;
 
+/**
+ * The wind slot of the fixed scalar-plus-wind pair. Empty until the particle
+ * layer lands (#3): it will take `viewer.windToDraw` (the u/v pair of the
+ * selected source) and the same run and step as the raster.
+ */
+function windLayers() {
+  return viewer.windToDraw.value ? [] : [];
+}
+
 function layers() {
   const current = texture.value;
   const palette = viewer.parameter.value?.["x-georiva"].palette;
-  if (!current || !palette) return [];
+  if (!current || !palette) return windLayers();
   return [
     new RasterLayer({
       id: LAYER_ID,
@@ -47,6 +56,7 @@ function layers() {
       opacity: 0.85,
       pickable: false,
     }),
+    ...windLayers(),
   ];
 }
 
@@ -83,7 +93,7 @@ watch(
   { immediate: true },
 );
 
-watch(() => viewer.parameter.value, repaint);
+watch([() => viewer.parameter.value, () => viewer.windToDraw.value], repaint);
 
 onMounted(() => {
   if (!container.value) return;
