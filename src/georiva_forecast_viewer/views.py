@@ -16,6 +16,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from georiva.core.machine_plane.addresses import render_config_token, vector_render_config_token
 from georiva.core.models import Collection
 from georiva.organisations.access import require_active_org
 from georiva.organisations.ownership import scope_rows
@@ -41,9 +42,10 @@ def visible_bindings(request):
     return scope_rows(request, bindings).select_related(
         "quantity",
         "source__collection__catalog",
-        "variable",
-        "u_variable",
-        "v_variable",
+        # The token reads each variable's collection and catalog (ADR 0038's clip mode).
+        "variable__collection__catalog",
+        "u_variable__collection__catalog",
+        "v_variable__collection__catalog",
     )
 
 
@@ -55,11 +57,17 @@ def describe_source(binding):
         "catalog": source.collection.catalog.slug,
         "collection": source.collection.slug,
     }
+    # ``version`` is core's render-config token, the ``v=`` a texture URL must
+    # carry: the reply is immutable for a year, and only the token makes an
+    # edit to the variable's range or clipping a *different* URL (ADR 0021).
+    # Minted here, in process, because the web may not spell it (ADR 0013).
     if binding.quantity.kind == binding.quantity.Kind.VECTOR:
         described["u"] = binding.u_variable.slug
         described["v"] = binding.v_variable.slug
+        described["version"] = vector_render_config_token(binding.u_variable, binding.v_variable)
     else:
         described["variable"] = binding.variable.slug
+        described["version"] = render_config_token(binding.variable)
     return described
 
 
@@ -83,4 +91,8 @@ class CatalogueView(APIView):
 
     def get(self, request):
         organisation = require_active_org(request)
-        return Response({"config": describe_config(organisation), "quantities": describe_quantities(request)})
+        response = Response({"config": describe_config(organisation), "quantities": describe_quantities(request)})
+        # Varies by audience at a URL that carries none (members see private
+        # sources), so no cache between here and a browser may share it (ADR 0029).
+        response["Cache-Control"] = "no-store"
+        return response

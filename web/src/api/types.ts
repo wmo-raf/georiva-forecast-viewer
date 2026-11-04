@@ -30,6 +30,12 @@ export interface Source {
   variable?: string;
   u?: string;
   v?: string;
+  /**
+   * Core's render-config token for the texture URL's `v=`: the reply is
+   * immutable, so a change to the variable's range or clipping must be a
+   * different URL (ADR 0021). Minted by the plugin, never by the web.
+   */
+  version: string;
 }
 
 /** `GET /api/runs/<catalog>/<collection>/` */

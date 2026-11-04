@@ -28,7 +28,7 @@ onMounted(viewer.load);
 <template>
   <div class="app">
     <MapView
-      v-if="viewer.state.catalogue && viewer.state.status !== 'error'"
+      v-if="viewer.state.catalogue"
       :config="viewer.state.catalogue.config"
       @texture-ready="textureReady = $event"
       @texture-error="textureError = $event"
@@ -51,6 +51,9 @@ onMounted(viewer.load);
         <p v-if="viewer.parameter.value" class="panel__note">
           {{ viewer.parameter.value.label }}
           <span v-if="viewer.parameter.value.unit">({{ viewer.parameter.value.unit.symbol }})</span>
+        </p>
+        <p v-if="viewer.state.sourceError" class="panel__note panel__note--error">
+          This source could not be loaded: {{ viewer.state.sourceError }}
         </p>
         <p v-if="textureError" class="panel__note panel__note--error">Texture failed: {{ textureError }}</p>
       </template>

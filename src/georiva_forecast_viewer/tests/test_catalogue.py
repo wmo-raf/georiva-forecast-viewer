@@ -6,10 +6,13 @@ see is absent, not forbidden, and another organisation's rows never appear
 however they are named.
 """
 
+from unittest.mock import ANY
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from georiva.core.machine_plane.addresses import render_config_token, vector_render_config_token
 from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, dial_org, join_org
 from georiva_forecast_viewer.models import Quantity
 
@@ -46,6 +49,7 @@ class CatalogueTests(TestCase):
                             "catalog": "models",
                             "collection": "ecmwf-ifs",
                             "variable": "t2m",
+                            "version": ANY,
                         },
                         {
                             "slug": "wrf",
@@ -53,11 +57,26 @@ class CatalogueTests(TestCase):
                             "catalog": "models",
                             "collection": "wrf-3km",
                             "variable": "t2",
+                            "version": ANY,
                         },
                     ],
                 }
             ],
         )
+
+    def test_each_source_carries_the_render_config_token_its_texture_urls_need(self):
+        """The texture reply is immutable for a year, so the URL must change when the range does (ADR 0021)."""
+        temperature = make_quantity("t2m")
+        wind = make_quantity("wind10", kind=Quantity.Kind.VECTOR)
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs")
+        bind(ifs, temperature, variable="t2m")
+        bind(ifs, wind, u="10u", v="10v")
+        variables = {v.slug: v for v in ifs.collection.variables.all()}
+
+        scalar, vector = self._quantities()
+        self.assertEqual(scalar["sources"][0]["version"], render_config_token(variables["t2m"]))
+        expected = vector_render_config_token(variables["10u"], variables["10v"])
+        self.assertEqual(vector["sources"][0]["version"], expected)
 
     def test_a_vector_quantity_carries_the_u_v_pair(self):
         wind = make_quantity("wind10", name="10 m wind", kind=Quantity.Kind.VECTOR)
@@ -116,6 +135,10 @@ class CatalogueVisibilityTests(TestCase):
         self._source_on("public", "ifs")
         self._source_on("public", "ifs", org_slug="other-org")
         self.assertEqual(self._sources(), ["ifs"])
+
+    def test_the_answer_is_never_shared_cached(self):
+        """It varies by audience at a URL that carries none: a member's listing must not be served to a stranger."""
+        self.assertEqual(self.client.get(reverse(URL))["Cache-Control"], "no-store")
 
     def test_an_unconfigured_organisation_answers_its_config_and_no_quantities(self):
         body = self.client.get(reverse(URL)).json()

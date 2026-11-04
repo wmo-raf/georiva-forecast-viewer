@@ -17,8 +17,11 @@ import { buildTimeline, stepIndex, type Timeline } from "./timeline";
 export type Status = "loading" | "ready" | "empty" | "error";
 
 interface State {
+  /** The catalogue load: the map exists once this is `ready` or `empty`. */
   status: Status;
   error: string | null;
+  /** A failed runs/EDR load for the selected source; the map stays up. */
+  sourceError: string | null;
   catalogue: Catalogue | null;
   selection: Selection | null;
   /** The source the timeline below describes; stale while a switch loads. */
@@ -32,6 +35,7 @@ interface State {
 const state = reactive<State>({
   status: "loading",
   error: null,
+  sourceError: null,
   catalogue: null,
   selection: null,
   timelineFor: null,
@@ -41,11 +45,20 @@ const state = reactive<State>({
   playing: false,
 });
 
+/** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
+const keyOf = (source: Source) => `${source.catalog}/${source.collection}`;
+
 const source = computed<Source | undefined>(() =>
   state.catalogue && state.selection ? sourceOf(state.catalogue, state.selection) : undefined,
 );
 
-const run = computed(() => state.timeline?.runs.find((r) => r.reference_time === state.timeline?.selected) ?? null);
+/** False from the moment the source changes until its own timeline has landed. */
+const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
+
+const run = computed(() => {
+  if (!timelineCurrent.value) return null;
+  return state.timeline?.runs.find((r) => r.reference_time === state.timeline?.selected) ?? null;
+});
 
 const times = computed(() => run.value?.valid_times ?? []);
 
@@ -55,7 +68,7 @@ const time = computed(() => times.value[state.step] ?? null);
 const variable = computed(() => source.value?.variable ?? null);
 
 const parameter = computed<EdrParameter | null>(() =>
-  variable.value && state.edr ? (state.edr.parameter_names[variable.value] ?? null) : null,
+  variable.value && state.edr && timelineCurrent.value ? (state.edr.parameter_names[variable.value] ?? null) : null,
 );
 
 const textureUrl = computed(() => {
@@ -76,28 +89,32 @@ async function load() {
   }
 }
 
-/** A source switch loads both routes together; a stale answer is dropped. */
+/**
+ * A source switch loads both routes together. An answer, or a failure, for a
+ * source the user has since left is dropped: only the current source may
+ * write the timeline or the error.
+ */
 async function loadSource(current: Source) {
-  const key = `${current.catalog}/${current.collection}`;
-  const [runs, edr] = await Promise.all([loadRuns(current), loadEdr(current)]);
-  if (source.value !== current) return;
-  state.edr = edr;
-  state.timeline = buildTimeline(runs, edr);
-  state.timelineFor = key;
-  state.step = 0;
+  const stillWanted = () => !!source.value && keyOf(source.value) === keyOf(current);
+  try {
+    const [runs, edr] = await Promise.all([loadRuns(current), loadEdr(current)]);
+    if (!stillWanted()) return;
+    state.edr = edr;
+    state.timeline = buildTimeline(runs, edr);
+    state.timelineFor = keyOf(current);
+    state.step = 0;
+    state.sourceError = null;
+  } catch (error) {
+    if (stillWanted()) state.sourceError = String(error);
+  }
 }
 
 watch(
   source,
   (current) => {
-    if (!current) return;
-    const key = `${current.catalog}/${current.collection}`;
-    if (key === state.timelineFor) return;
+    if (!current || keyOf(current) === state.timelineFor) return;
     state.playing = false;
-    loadSource(current).catch((error) => {
-      state.status = "error";
-      state.error = String(error);
-    });
+    void loadSource(current);
   },
   { immediate: true },
 );

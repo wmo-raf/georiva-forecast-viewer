@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Catalogue } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourcesFor } from "./selection";
 
-const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs" };
-const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km" };
+const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs", version: "v1" };
+const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2" };
 
 const catalogue: Catalogue = {
   config: { org: "kmd", basemap_style: null, default_view: { center: [20, 0], zoom: 3 } },

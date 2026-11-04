@@ -61,6 +61,8 @@ watch(
     if (!url) {
       texture.value = null;
       repaint();
+      emit("textureError", null);
+      emit("textureReady", true);
       return;
     }
     emit("textureReady", false);
