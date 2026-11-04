@@ -137,13 +137,6 @@ button {
   font-size: 14px;
 }
 
-.rail__tag {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fv-muted);
-}
-
 .rail__wind {
   margin-top: 6px;
   border-top: 1px solid var(--fv-border);

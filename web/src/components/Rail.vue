@@ -31,7 +31,6 @@ const windAvailable = computed(() => viewer.windBinding.value !== null);
       >
         <component :is="iconFor(q.icon)" class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
         <span class="rail__label">{{ q.name }}</span>
-        <span v-if="q.sources.length === 1" class="rail__tag">{{ q.sources[0].name }}</span>
       </button>
     </div>
     <label class="rail__wind" :class="{ 'rail__wind--off': !windAvailable }">
