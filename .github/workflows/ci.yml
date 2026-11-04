@@ -1,0 +1,215 @@
+name: CI
+
+# The gate on every pull request: both halves of the plugin, linted and tested.
+#
+# `push: main` is not redundant with `pull_request`. A GitHub Actions cache
+# written on a PR branch is readable only from that PR; only entries written on
+# the default branch are visible to every other branch. Main's runs are what
+# keep PR runs warm — here, the npm cache.
+#
+# Releases are not built here. Tagging happens in release.yml, which is
+# dispatched by hand and runs this file's web checks again before it commits a
+# bundle, so nothing reaches a tag without passing them.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel a superseded PR run when a fixup is pushed, but never cancel a run on
+# main: that would throw away both the "main is green" signal and the cache
+# write every later PR reads from.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # The core image the plugin is tested against. `main` on purpose: this plugin
+  # is written against core's public HTTP routes and models (ADR 0036), and a
+  # core change that breaks it should surface here, on the next PR, rather than
+  # on a server. The cost is a CI run that can go red without a plugin change —
+  # when that happens the fix is a core issue, not a pin. Pin this to a release
+  # tag (`ghcr.io/wmo-raf/georiva:v0.5.0`) only to maintain a plugin branch for
+  # an older core.
+  GEORIVA_IMAGE: ghcr.io/wmo-raf/georiva:main
+
+  # Workflow-level env does not cross files, so release.yml carries its own
+  # copy of this. Keep the two the same: the bundle a release ships should be
+  # built on the runtime CI tested it on.
+  NODE_VERSION: "22"
+
+jobs:
+  lint-python:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Ruff is a single binary and reads ./ruff.toml, so this needs neither the
+    # core image nor a database. It is the fastest signal here and the one most
+    # likely to be the only thing red, which is why it reports on its own
+    # rather than from behind a test failure.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      # `make lint` and not a bare ruff invocation, so what CI checks and what
+      # `make format` fixes can never drift: both read the pinned version from
+      # one line in the Makefile.
+      - name: Check lint and formatting
+        run: make lint
+
+  web:
+    name: Web (lint, typecheck, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `ci`, not `install`: it installs exactly the lockfile and fails if
+      # package.json and the lockfile disagree, which is the check that keeps a
+      # release reproducible.
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # The build runs on every PR even though only a release commits its
+      # output. A bundle that does not build is the one failure that would
+      # otherwise be found for the first time during a release, when the fix is
+      # most expensive — and `vite build` catches what `vue-tsc` does not, such
+      # as an import that resolves for the type checker but has no runtime
+      # module behind it.
+      #
+      # The output is discarded. It lands in the plugin's static folder, which
+      # .gitignore keeps out of a working tree and only release.yml force-adds.
+      - name: Build the bundle
+        run: npm run build
+
+  django:
+    name: Plugin tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The plugin half is a Django app with no dependencies of its own: Django,
+    # Wagtail and core's models all come from the core image, which is why
+    # there is no uv sync here. The image is pulled rather than built — it is
+    # the artifact servers run, and building core from source in this repo
+    # would mean carrying core's build cache and its service matrix as well.
+    services:
+      # The app's own database image. Tests connect to it directly rather than
+      # through PgBouncer, which cannot CREATE DATABASE.
+      postgres:
+        image: timescale/timescaledb-ha:pg18
+        env:
+          POSTGRES_USER: georiva
+          POSTGRES_PASSWORD: georiva
+          POSTGRES_DB: georiva
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U georiva"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+      # Core's settings wire a real django-redis cache at import time, so the
+      # suite needs one to talk to even where these tests do not read it.
+      redis:
+        image: redis:alpine3.22
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      # Into the path the core image discovers plugins from, so the mount below
+      # is a single directory and the container sees the layout dev does.
+      - uses: actions/checkout@v4
+        with:
+          path: georiva-forecast-viewer
+
+      - name: Pull the core image
+        run: docker pull "$GEORIVA_IMAGE"
+
+      - name: Write container environment
+        run: |
+          cat > "$RUNNER_TEMP/ci.env" <<'EOF'
+          DATABASE_URL=timescalegis://georiva:georiva@localhost:5432/georiva
+          REDIS_URL=redis://localhost:6379/0
+          GEORIVA_LOG_LEVEL=WARNING
+          EOF
+
+      # Four things about this `georiva` wrapper are load-bearing.
+      #
+      # The settings module is core's *dev* settings even though this is the
+      # production image. The two images share one venv and one copy of the app;
+      # dev settings are the ones that will build a test database and do not
+      # demand a site's secrets, and nothing here exercises a production-only
+      # setting.
+      #
+      # The mount is read-only because that is how a server has it. ADR 0035
+      # mounts the shared plugin volume read-only at /georiva/site-plugins in
+      # every backend service, so a plugin that needs to write inside its own
+      # package is already broken in production — and the failure would show up
+      # there rather than here if CI mounted it read-write. Nothing in this
+      # suite writes there today; the mount is what keeps that true.
+      #
+      # PYTHONDONTWRITEBYTECODE is the other half of that: the container runs
+      # as the image's own uid, not the runner's, and __pycache__ is the one
+      # thing Python would try to write into the mount unasked.
+      #
+      # The mount lands at /georiva/dev-plugins/<repo>, which core's settings
+      # append to GEORIVA_PLUGIN_DIRS when it exists; discovery then derives the
+      # app name from the package under src/, not from the folder.
+      #
+      # One step and a shell function rather than two steps repeating six
+      # flags. The two commands are grouped in the log, and each says plainly
+      # which it was when it fails.
+      - name: Run the plugin's tests and check its migrations
+        run: |
+          georiva() {
+            docker run --rm --network host \
+              --env-file "$RUNNER_TEMP/ci.env" \
+              -e DJANGO_SETTINGS_MODULE=georiva.config.settings.dev \
+              -e PYTHONDONTWRITEBYTECODE=1 \
+              -v "$PWD/georiva-forecast-viewer:/georiva/dev-plugins/georiva-forecast-viewer:ro" \
+              "$GEORIVA_IMAGE" "$@"
+          }
+
+          # --noinput is not decoration: on a leftover test database the runner
+          # prompts, and with no tty attached that is an EOFError, not a message.
+          echo "::group::Django test suite"
+          georiva manage test --noinput --verbosity 2 georiva_forecast_viewer
+          echo "::endgroup::"
+
+          # The suite builds its database from migrations, so a model changed
+          # without one usually passes and only fails on a server. The suite
+          # cannot catch that; this can.
+          echo "::group::Missing migrations"
+          georiva manage makemigrations --check --dry-run georiva_forecast_viewer
+          echo "::endgroup::"

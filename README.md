@@ -76,3 +76,77 @@ make lint
 
 The web half lives in `web/` and has its own README: `npm run dev` there serves
 it against the local stack, proxied under one organisation's host.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on main:
+
+| Job | What it runs |
+|---|---|
+| Lint (ruff) | `make lint` — the same pinned ruff `make format` applies |
+| Web | `npm ci`, then `lint` (eslint), `typecheck` (vue-tsc), `test` (vitest) and `build` |
+| Plugin tests | the Django suite, inside the published core image |
+
+The plugin suite runs against `ghcr.io/wmo-raf/georiva:main` — the image
+servers run — with the repo bind-mounted where core discovers plugins, so no
+part of core is rebuilt here. Tracking `main` means a core change that breaks
+this plugin shows up on the next pull request rather than on a server; when
+that happens the fix belongs in core, and the `GEORIVA_IMAGE` value at the top
+of the workflow is pinned to a release tag only to keep a branch alive for an
+older core.
+
+The web bundle is built on every pull request and thrown away. Only a release
+commits it.
+
+## Releasing
+
+The installer (core's ADR 0035) does `git clone --depth 1 --branch <tag>`, runs
+no hooks and has no node: **whatever is committed at the tag is what a server
+gets**, so the built bundle has to be in the tree the tag points at. It is not
+on main, where a minified bundle would make every diff unreadable. Each tag is
+main's tip plus one commit holding the bundle:
+
+```
+main:  … ── A ── B (tip)
+                   ╲
+                    C ← v0.2.0   (B's tree + static/forecast_viewer/)
+```
+
+To cut a release:
+
+1. On a branch, bump the version in **both** `pyproject.toml` and
+   `georiva_plugin_info.json`, and merge it to main. The release workflow
+   checks the two against the tag and refuses a release where they disagree —
+   the version is a reviewed commit, not something CI writes on its way past.
+2. Run the **Release** workflow from the Actions tab (`workflow_dispatch`) with
+   the version, including the `v` — `v0.2.0`. It only runs from main.
+
+It refuses to start unless CI is green for the commit it would release, re-runs
+the web checks, builds the bundle, commits it to a detached commit on main's
+tip, and then — before pushing anything — clones its own local tag the way the
+installer would and runs `collectstatic` in the core image, failing if
+`/static/forecast_viewer/index.html` does not come out of it. Only then is the
+tag pushed and a GitHub release opened with the manifest entry below. A tag is
+never moved or rebuilt: to fix a bad release, bump the version and cut another
+one, because a server pins a tag and is entitled to have it keep meaning one
+tree.
+
+It releases **main's tip at the moment you dispatch it**, which is not
+necessarily the commit that bumped the version — anything merged in between
+ships too. The release notes name the exact source commit for that reason.
+
+A site installs it through `deploy/plugins.toml`:
+
+```toml
+[[plugin]]
+name = "georiva-forecast-viewer"
+git = "https://github.com/wmo-raf/georiva-forecast-viewer.git"
+tag = "v0.2.0"
+```
+
+`collectstatic` then collects `static/forecast_viewer/` from the installed app
+and nginx serves the viewer from `/static/forecast_viewer/`.
+
+Building locally is how you check the bundle before releasing it
+(`cd web && npm run build`); the output is gitignored, so there is nothing to
+undo afterwards and no way to commit it to main by accident.

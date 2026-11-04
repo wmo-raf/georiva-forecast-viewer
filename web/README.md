@@ -99,9 +99,28 @@ consistent with the colour it would be explaining.
 npm install
 npm run dev        # http://localhost:5173/static/forecast_viewer/
 npm test           # vitest, the pure modules
-npm run typecheck
+npm run typecheck  # vue-tsc
+npm run lint       # eslint; --fix with `npm run lint:fix`
 npm run build      # into the plugin's static folder
 ```
+
+CI runs all of these on every pull request (`../.github/workflows/ci.yml`), so
+`npm ci && npm run lint && npm run typecheck && npm test && npm run build` is
+the whole gate. The build is in it because a bundle that does not build would
+otherwise be found for the first time during a release; `vite build` also
+catches what `vue-tsc` cannot, such as an import that type-checks but has no
+runtime module behind it. On a pull request the output is thrown away.
+
+`eslint.config.js` is deliberately thin. `vue-tsc` already holds this code to
+a strict TypeScript contract, and `eslint-plugin-vue`'s recommended tiers are
+mostly template formatting that no formatter here applies — so the config
+takes the plugin's `essential` tier plus a few correctness rules, and `lint`
+runs with `--max-warnings 0`. Nothing it reports can be ignored, which is the
+point of not loading it with warnings in the first place.
+
+`npm run build` writes into `../src/georiva_forecast_viewer/static/forecast_viewer/`,
+which is gitignored: the bundle is committed once per release by the release
+workflow, never by hand. See the root README.
 
 `npm run dev` proxies `/api` and `/titiler` to the local GeoRiva stack under
 one organisation's host. Copy `.env.example` to `.env` to point it at another
@@ -121,6 +140,14 @@ organisation.
   from `import.meta.url`.
 - `weatherlayers-gl` is dual-licensed (MPL-2.0 or its own terms); the MPL
   option is what this bundle uses.
+- `package.json` carries one `overrides` entry, `minimatch: ^11.0.4`, which
+  package.json has no way to explain itself. The eslint tree arrives with
+  `minimatch` 10.x through both `@eslint/config-array` and
+  `@typescript-eslint/typescript-estree`, and every 10.x is subject to
+  GHSA-g3hv-75wg-m249 — a ReDoS via glob-parts amplification. It is
+  dev-only and `npm audit`'s own suggested fix was to downgrade eslint a major
+  version, so the override is the smaller change: eleven moderate advisories
+  to none, with nothing in either package's own range against 11.x.
 
 ### GHSA-jrc7-96c5-q579
 
