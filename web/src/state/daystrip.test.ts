@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellOf, dayCells, progressWithin } from "./daystrip";
+import { cellOf, dayCells, progressWithin, stepLabel } from "./daystrip";
 
 const times = [
   "2026-11-03T12:00:00+00:00",
@@ -38,5 +38,18 @@ describe("the day strip groups a run's steps by UTC day", () => {
 
   it("has no cells for an empty run", () => {
     expect(dayCells([])).toEqual([]);
+  });
+});
+
+describe("naming one step", () => {
+  it("gives the UTC weekday, day of month and time of day", () => {
+    expect(stepLabel(times[1])).toBe("Tue 3 · 15:00 UTC");
+    expect(stepLabel(times[4])).toBe("Wed 4 · 00:00 UTC");
+  });
+
+  it("reads a step in another zone as the UTC time it is", () => {
+    // The same instant, written +03:00: a forecast time must not shift by the
+    // zone it happens to be written in, or it would leave its own cell.
+    expect(stepLabel("2026-11-03T18:00:00+03:00")).toBe("Tue 3 · 15:00 UTC");
   });
 });

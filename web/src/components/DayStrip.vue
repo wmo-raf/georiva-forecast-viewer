@@ -9,7 +9,7 @@
  */
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-vue-next";
 import { computed, onBeforeUnmount, watch } from "vue";
-import { cellOf, dayCells, progressWithin } from "../state/daystrip";
+import { cellOf, dayCells, progressWithin, stepLabel } from "../state/daystrip";
 import { useViewer } from "../state/store";
 
 const viewer = useViewer();
@@ -29,13 +29,8 @@ const playhead = computed(() => {
 /** The label follows the playhead but stays clear of the strip's ends. */
 const labelLeft = computed(() => Math.min(0.93, Math.max(0.07, playhead.value)));
 
-const label = computed(() => {
-  const iso = viewer.time.value;
-  if (!iso) return "";
-  const d = new Date(iso);
-  const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", timeZone: "UTC" });
-  return `${day} · ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
-});
+/** Named in one place, `state/daystrip.ts`, so every label of a step matches. */
+const label = computed(() => (viewer.time.value ? stepLabel(viewer.time.value) : ""));
 
 /** A click inside a cell picks the step nearest that point of the day. */
 function pickInCell(cellIndex: number, event: MouseEvent) {
