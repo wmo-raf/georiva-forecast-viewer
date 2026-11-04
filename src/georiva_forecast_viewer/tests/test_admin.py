@@ -121,6 +121,32 @@ class SourceAdminTests(TestCase):
         row_errors = response.context["form"].formsets["bindings"].errors[0]
         self.assertIn("variable", row_errors)
 
+    def test_a_variable_from_another_collection_is_refused_on_a_new_source(self):
+        """The parent is unsaved when its rows validate, which must not switch the rule off."""
+        other = make_collection("wrf-3km", variables=("t2",))
+        response = self.client.post(
+            reverse(f"{SOURCE}:add"),
+            {
+                "collection": str(self.collection.pk),
+                "slug": "ifs",
+                "name": "ECMWF IFS",
+                "order": "0",
+                **bindings_payload({"quantity": self.temperature, "variable": other.variables.get(slug="t2")}),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ForecastSource.objects.exists())
+        self.assertIn("variable", response.context["form"].formsets["bindings"].errors[0])
+
+    def test_a_saved_source_offers_only_its_own_collections_variables(self):
+        make_collection("wrf-3km", variables=("t2",))
+        source = make_source(self.collection, slug="ifs")
+        response = self.client.get(reverse(f"{SOURCE}:edit", args=[source.pk]))
+        self.assertEqual(response.status_code, 200)
+        mine = sorted(self.collection.variables.values_list("pk", flat=True))
+        for field in ("variable", "u_variable", "v_variable"):
+            self.assertEqual(sorted(self._offered(response, field, prefix="bindings")), mine)
+
     def test_only_this_organisations_collections_and_quantities_are_offered(self):
         theirs = make_collection("ecmwf-ifs", org_slug="other-org")
         their_quantity = make_quantity("t2m", org_slug="other-org")

@@ -9,7 +9,7 @@ re-checks the rasters themselves at render time.
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from georiva_forecast_viewer.models import Quantity, QuantityBinding
+from georiva_forecast_viewer.models import ForecastSource, Quantity, QuantityBinding
 
 from .factories import WRF_VARIABLES, make_collection, make_quantity, make_source
 
@@ -66,3 +66,33 @@ class BindingValidationTests(TestCase):
     def test_a_quantity_from_another_organisation_is_refused(self):
         foreign = make_quantity("t2m", org_slug="other-org")
         self.assertRefused(self._binding(foreign, variable=self.variables["t2m"]), "quantity")
+
+    def test_an_unsaved_source_still_refuses_a_foreign_variable(self):
+        """On the add form the parent has no pk yet; the rule must read the object, not the id."""
+        wrf = make_collection("wrf-3km", variables=WRF_VARIABLES)
+        unsaved = ForecastSource(collection=self.ifs.collection, slug="new", name="New")
+        binding = QuantityBinding(source=unsaved, quantity=self.temperature, variable=wrf.variables.get(slug="t2"))
+        # ``source`` excluded as the inline formset excludes it: an unsaved parent
+        # fails the field's own check, which is not the rule under test.
+        with self.assertRaises(ValidationError) as caught:
+            binding.full_clean(exclude=["source"])
+        self.assertEqual(list(caught.exception.message_dict), ["variable"])
+
+
+class QuantityKindTests(TestCase):
+    """A quantity's kind is fixed once bound: its bindings are shaped by it."""
+
+    def test_the_kind_cannot_change_while_bindings_exist(self):
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs")
+        temperature = make_quantity("t2m")
+        t2m = ifs.collection.variables.get(slug="t2m")
+        QuantityBinding.objects.create(source=ifs, quantity=temperature, variable=t2m)
+        temperature.kind = Quantity.Kind.VECTOR
+        with self.assertRaises(ValidationError) as caught:
+            temperature.full_clean()
+        self.assertIn("kind", caught.exception.message_dict)
+
+    def test_the_kind_can_change_while_nothing_is_bound(self):
+        temperature = make_quantity("t2m")
+        temperature.kind = Quantity.Kind.VECTOR
+        temperature.full_clean()

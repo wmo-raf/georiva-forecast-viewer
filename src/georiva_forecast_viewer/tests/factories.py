@@ -41,7 +41,7 @@ def make_source(collection, slug="ifs", **fields):
 
 def bind(source, quantity, variable=None, u=None, v=None):
     """A binding by variable *slug*, resolved against the source's collection."""
-    by_slug = {v.slug: v for v in source.collection.variables.all()}
+    by_slug = {var.slug: var for var in source.collection.variables.all()}
     return QuantityBinding.objects.create(
         source=source,
         quantity=quantity,

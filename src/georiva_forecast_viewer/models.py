@@ -24,6 +24,14 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 
+from georiva.organisations.access import organisation_of
+
+#: The three fields a binding may name a variable in.
+VARIABLE_FIELDS = ("variable", "u_variable", "v_variable")
+
+#: The same-collection refusal, worded once: the model and the source form both say it.
+FOREIGN_VARIABLE = "Choose a variable from this source's collection."
+
 
 class Quantity(models.Model):
     """A shared, source-independent thing a user can pick."""
@@ -57,6 +65,18 @@ class Quantity(models.Model):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        """The kind is fixed once bound: every binding of this quantity is shaped by it."""
+        super().clean()
+        if self.pk is None:
+            return
+        saved_kind = Quantity.objects.filter(pk=self.pk).values_list("kind", flat=True).first()
+        if saved_kind is not None and saved_kind != self.kind and self.bindings.exists():
+            raise ValidationError(
+                {"kind": ValidationError("This quantity is bound; remove its bindings before changing its kind.")},
+                code="bound",
+            )
 
 
 class ForecastSource(ClusterableModel):
@@ -140,11 +160,19 @@ class QuantityBinding(models.Model):
         super().clean()
         errors = {}
 
-        if self.quantity_id and self.source_id:
-            if self.quantity.organisation_id != self.source.collection.catalog.organisation_id:
-                errors["quantity"] = ValidationError(
-                    "This quantity belongs to another organisation.", code="foreign_quantity"
-                )
+        # The object, not ``source_id``: on the add form the rows validate
+        # against a parent that has no pk yet, and an id-based guard would
+        # switch every rule below off exactly when a new source is being made.
+        try:
+            source = self.source
+        except ForecastSource.DoesNotExist:
+            source = None
+        collection_id = getattr(source, "collection_id", None)
+
+        if self.quantity_id and collection_id and self.quantity.organisation_id != organisation_of(source).pk:
+            errors["quantity"] = ValidationError(
+                "This quantity belongs to another organisation.", code="foreign_quantity"
+            )
 
         kind = self.quantity.kind if self.quantity_id else None
         if kind == Quantity.Kind.VECTOR:
@@ -170,15 +198,13 @@ class QuantityBinding(models.Model):
                         "A scalar quantity is one variable; leave the components blank.", code="component_on_scalar"
                     )
 
-        if self.source_id:
-            for field in ("variable", "u_variable", "v_variable"):
+        if collection_id:
+            for field in VARIABLE_FIELDS:
                 if field in errors:
                     continue
                 chosen = getattr(self, field)
-                if chosen is not None and chosen.collection_id != self.source.collection_id:
-                    errors[field] = ValidationError(
-                        "Choose a variable from this source's collection.", code="foreign_variable"
-                    )
+                if chosen is not None and chosen.collection_id != collection_id:
+                    errors[field] = ValidationError(FOREIGN_VARIABLE, code="foreign_variable")
 
         if errors:
             raise ValidationError(errors)
