@@ -67,8 +67,23 @@ export interface Tick {
   textColour: string;
 }
 
+/**
+ * The top of the range, closing a stepped bar. It is the one boundary no class
+ * begins at, so without it the scale never ends. It gets room of its own at the
+ * end of the bar, carrying the last class's colour so that the class reads as
+ * one band widened to hold its number: a block is far too narrow for a number,
+ * and a label floating over the end would sit on the block before it.
+ */
+export interface LegendEnd {
+  label: string;
+  /** The last class's colour, so the band runs on under the number. */
+  colour: string;
+  /** Near-black or near-white, whichever reads on it. */
+  textColour: string;
+}
+
 export type Legend =
-  | { kind: "stepped"; classes: LegendClass[] }
+  | { kind: "stepped"; classes: LegendClass[]; end: LegendEnd }
   | { kind: "continuous"; gradient: string; ticks: Tick[] };
 
 /**
@@ -172,18 +187,26 @@ function sample(stops: PaletteStop[], value: number): Rgba {
 function steppedLegend(folded: Run[], unit: string): Legend {
   const every = Math.max(1, Math.ceil(folded.length / MAX_LABELS));
   const suffix = unit ? ` ${unit}` : "";
+  const top = folded[folded.length - 1];
+  const topColour = composite(top.colour);
   return {
     kind: "stepped",
     classes: folded.map((run, index) => {
       const colour = composite(run.colour);
+      // The top of the range is drawn over the last class, so that class gives
+      // up its own boundary rather than show two numbers in one block. It is
+      // the boundary the stride is likeliest to have dropped anyway — unless
+      // the palette is a single class, which has the width for both.
+      const crowded = index === folded.length - 1 && folded.length > 1;
       return {
         value: run.low,
-        label: index % every === 0 ? label(run.low) : null,
+        label: !crowded && index % every === 0 ? label(run.low) : null,
         title: `${label(run.low)} – ${label(run.high)}${suffix}`,
         colour: css(colour),
         textColour: textOn(colour),
       };
     }),
+    end: { label: label(top.high), colour: css(topColour), textColour: textOn(topColour) },
   };
 }
 

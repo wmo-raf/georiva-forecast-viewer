@@ -36,6 +36,11 @@ const bar = computed(() =>
       >
         <span v-if="band.label" class="legend__value">{{ band.label }}</span>
       </div>
+      <!-- The top of the range, on the last class's colour: the one boundary
+           no class begins at, and so the one that closes the scale. -->
+      <span class="legend__end" :style="{ background: bar.end.colour, color: bar.end.textColour }">
+        {{ bar.end.label }}
+      </span>
     </div>
 
     <!-- A ramp: the gradient, with a few values named on top of it. -->

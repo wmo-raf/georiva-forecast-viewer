@@ -348,6 +348,17 @@ button {
   margin-left: 10px;
 }
 
+/* The top of the range takes room of its own at the end of the bar rather than
+   floating over the block before it. It carries the last class's colour, so
+   that class reads as one band widened to hold the number that closes it. */
+.legend__end {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 10px 0 2px;
+  white-space: nowrap;
+}
+
 .legend__ramp--smooth {
   flex: 1 1 auto;
 }

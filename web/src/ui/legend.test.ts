@@ -136,7 +136,18 @@ describe("the blocks a classification draws", () => {
       (_, i): [number, number, [number, number, number]] => [i, i + 1, [i * 20, i * 20, i * 20]],
     );
     const drawn = stepped(classes(bands)).classes;
-    expect(drawn.every((band) => band.label !== null)).toBe(true);
+    // All but the last, whose block the top of the range is drawn over.
+    expect(drawn.slice(0, -1).every((band) => band.label !== null)).toBe(true);
+  });
+
+  it("closes the scale with the top of the range, on the last class's colour", () => {
+    // The one boundary no class begins at: without it the bar would end at 5,
+    // the lower bound of a class that runs to 20.
+    const bar = stepped(RAIN);
+    expect(bar.end).toEqual({ label: "20", colour: "rgb(255,255,255)", textColour: "#111" });
+    // That last class gives up its own boundary rather than show two numbers.
+    expect(bar.classes.at(-1)?.label).toBeNull();
+    expect(bar.classes.at(-1)?.title).toBe("5 – 20");
   });
 
   it("draws every class but labels at most twelve, always including the first", () => {
@@ -178,9 +189,11 @@ describe("the blocks a classification draws", () => {
   it("draws a palette of one class as the single block it is", () => {
     // The ramp's divide-by-zero guard does not apply: there is no span to
     // divide by, only one colour that covers everything.
-    const only = stepped(classes([[0, 50, [10, 20, 30]]])).classes;
-    expect(only).toHaveLength(1);
-    expect(only[0]).toMatchObject({ value: 0, label: "0", title: "0 – 50" });
+    const bar = stepped(classes([[0, 50, [10, 20, 30]]]));
+    expect(bar.classes).toHaveLength(1);
+    // Wide enough for both: the one class keeps its own boundary as well.
+    expect(bar.classes[0]).toMatchObject({ value: 0, label: "0", title: "0 – 50" });
+    expect(bar.end.label).toBe("50");
   });
 
   it("reads past a closing stop for everything above the range", () => {
