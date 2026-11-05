@@ -42,8 +42,8 @@ onMounted(viewer.load);
         <p v-for="message in warnings" :key="message">{{ message }}</p>
       </div>
       <ModelPanel />
-      <Legend />
       <footer class="bottom">
+        <Legend />
         <DayStrip :frame-ready="frameReady" />
       </footer>
     </template>

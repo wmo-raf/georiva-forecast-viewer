@@ -283,60 +283,111 @@ button {
 
 /* ---- legend ---- */
 
+/* One pill, no padding of its own: the colour reaches its edge and the
+   rounding clips it. The legend is a flow item in `.bottom`, so nothing here
+   reserves space for it or has to be told how tall the day strip is. */
 .legend {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 4;
-  width: min(360px, calc(100vw - 32px));
-  background: var(--fv-panel);
+  display: flex;
+  align-items: stretch;
+  height: 22px;
+  width: max-content;
+  max-width: 100%;
+  background: var(--fv-panel-solid);
   border: 1px solid var(--fv-border);
-  border-radius: var(--fv-radius);
+  border-radius: 999px;
   box-shadow: var(--fv-shadow);
-  padding: 8px 12px 6px;
-  backdrop-filter: blur(10px);
+  overflow: hidden;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .legend__unit {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  /* Asymmetric: the left side has the pill's own rounding to clear. */
+  padding: 0 8px 0 12px;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--fv-muted);
+  white-space: nowrap;
 }
 
-.legend__bar {
-  height: 10px;
-  border-radius: 5px;
-  margin: 4px 0 2px;
-}
-
-.legend__ticks {
+.legend__ramp {
   position: relative;
-  height: 14px;
-  font-size: 11px;
-  color: var(--fv-muted);
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-/* Each tick sits under the colour it names; the ends stay inside the bar. */
+/* Equal blocks: a classification is not an axis, so a narrow class is as wide
+   as a broad one and always has room for the value that names it. */
+/* The width is set rather than left to `flex-basis`: the pill is sized by its
+   contents (`width: max-content`), and a flex item contributes its width to
+   that, never its basis — a block sized only by basis would measure as nothing
+   and collapse the pill. It still shrinks when the pill meets its maximum. */
+.legend__class {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  width: 38px;
+  min-width: 0;
+  padding-left: 4px;
+  overflow: hidden;
+}
+
+/* The first block is cut into by the pill's rounding; its value clears it. */
+.legend__class:first-child {
+  padding-left: 10px;
+}
+
+.legend__value {
+  white-space: nowrap;
+}
+
+/* A ramp has no blocks to measure — its labels are absolutely positioned on it
+   — so it carries the width the pill is sized from. */
+.legend__ramp--smooth {
+  flex: 1 1 auto;
+  width: 240px;
+}
+
+/* On a ramp each value sits on the colour it names, the ends staying inside. */
 .legend__tick {
   position: absolute;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
+/* The ends are nudged clear of the pill's rounding, which would otherwise cut
+   into them — the same inset the first block of a classification gets. */
 .legend__tick:first-child {
-  transform: none;
+  transform: translateY(-50%);
+  margin-left: 8px;
 }
 
 .legend__tick:last-child {
-  transform: translateX(-100%);
+  transform: translate(-100%, -50%);
+  margin-left: -8px;
 }
 
 /* ---- bottom strip ---- */
 
+/* The legend rides above the strip rather than beside it, so neither has to
+   reserve width for the other — the legend's own width follows its palette. */
 .bottom {
   position: absolute;
   left: 16px;
-  right: 400px;
+  right: 16px;
   bottom: 16px;
   z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.bottom > .strip {
+  align-self: stretch;
 }
 
 .strip {
@@ -472,11 +523,7 @@ button {
     max-height: 40vh;
   }
   .bottom {
-    right: 16px;
     bottom: 96px;
-  }
-  .legend {
-    width: calc(100vw - 32px);
   }
   .model {
     bottom: 196px;
