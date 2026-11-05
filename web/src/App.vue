@@ -42,9 +42,12 @@ onMounted(viewer.load);
         <p v-for="message in warnings" :key="message">{{ message }}</p>
       </div>
       <ModelPanel />
+      <!-- One row: the time control takes what is left of the width, the
+           legend closes it on the right. On a narrow viewport the legend
+           moves back above the row; `style.css` does that with `order`. -->
       <footer class="bottom">
-        <Legend />
         <DayStrip :frame-ready="frameReady" />
+        <Legend />
       </footer>
     </template>
   </div>

@@ -9,6 +9,14 @@
   --fv-error: #ff8a80;
   --fv-radius: 12px;
   --fv-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  /* The bottom bar's geometry, named once. Anything that has to stand clear of
+     the bar reads these rather than restating a number that then goes stale
+     the next time the bar changes height. `--fv-bar-h` is one pill's height;
+     `--fv-bar-total` the whole bar's, which is the same until it wraps onto
+     two rows on a narrow viewport. */
+  --fv-bar-h: 32px;
+  --fv-bar-total: var(--fv-bar-h);
+  --fv-bar-bottom: 16px;
   font-family:
     system-ui,
     -apple-system,
@@ -167,10 +175,11 @@ button {
 
 /* ---- model panel ---- */
 
+/* Stands clear of the bottom bar, whatever height the bar is. */
 .model {
   position: absolute;
   right: 16px;
-  bottom: 118px;
+  bottom: calc(var(--fv-bar-bottom) + var(--fv-bar-total) + 10px);
   z-index: 4;
   display: flex;
   /* The toggle comes first in the DOM, so Tab reaches it before the options it opens; drawn above them. */
@@ -383,101 +392,138 @@ button {
   margin-left: -8px;
 }
 
-/* ---- bottom strip ---- */
+/* ---- bottom bar ---- */
 
-/* The legend rides above the strip rather than beside it, so neither has to
-   reserve width for the other. */
+/* One row along the bottom: the controls, the days, then the legend closing
+   it on the right. The time control takes whatever the legend's fixed width
+   leaves, so it ends where the legend starts and never spans the page. */
 .bottom {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: 16px;
+  bottom: var(--fv-bar-bottom);
   z-index: 4;
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
 }
 
-.bottom > .strip {
-  align-self: stretch;
+/* Its width is its own; the time control takes the rest. */
+.bottom > .legend {
+  flex: 0 0 auto;
 }
 
+/* Layout only — no background, no border, no padding. The chrome belongs to
+   the two pills inside it, which is what puts the play buttons outside the
+   days rather than in a frame around them. */
 .strip {
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The one case with no pills inside it, so it carries the chrome itself. */
+.strip--empty {
+  align-items: center;
   background: var(--fv-panel);
   border: 1px solid var(--fv-border);
   border-radius: var(--fv-radius);
   box-shadow: var(--fv-shadow);
-  padding: 8px;
   backdrop-filter: blur(10px);
-}
-
-.strip--empty {
+  padding: 0 12px;
+  height: var(--fv-bar-h);
   font-size: 13px;
   color: var(--fv-muted);
-  padding: 14px;
+}
+
+/* Both pills: the same chrome, and no padding of their own, so what is inside
+   reaches the edge and the rounding clips it — the legend's treatment. */
+.strip__controls,
+.strip__days {
+  height: var(--fv-bar-h);
+  box-sizing: border-box;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
 }
 
 .strip__controls {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex: 0 0 auto;
+  /* Nothing inside has to escape it, so the rounding can clip the buttons. */
+  overflow: hidden;
 }
 
 .strip__button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--fv-border);
-  border-radius: 10px;
+  width: 34px;
+  border: 0;
+  /* A hairline between the buttons instead of a frame around each. */
+  border-right: 1px solid var(--fv-border);
   background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
 }
 
+.strip__button:last-child {
+  border-right: 0;
+}
+
+/* Play still reads as the primary action, by its fill rather than its size. */
 .strip__button--play {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
   background: var(--fv-fg);
   color: var(--fv-accent-fg);
 }
 
+/* Not clipped, unlike the controls: the tooltip stands above the panel and is
+   a child of it, so the end cells round themselves instead. */
 .strip__days {
   position: relative;
   flex: 1 1 auto;
+  min-width: 0;
   display: flex;
-  border-radius: 8px;
+  /* The whole panel scrubs on press-and-drag, so a touch drag must not take
+     the page with it. */
+  touch-action: none;
+  user-select: none;
 }
 
-.strip__day:first-child {
-  border-radius: 8px 0 0 8px;
-}
-
-.strip__day:last-child {
-  border-radius: 0 8px 8px 0;
-}
-
+/* One line per cell: the day number and its weekday side by side. Two lines
+   is what made the control twice as tall as it needs to be. */
 .strip__day {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
-  gap: 1px;
-  padding: 6px 0;
+  gap: 5px;
+  padding: 0;
   border: 0;
   border-right: 1px solid var(--fv-border);
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
+  overflow: hidden;
 }
 
 .strip__day:last-child {
   border-right: 0;
+}
+
+/* The panel's radius less its 1px border, so the cell meets the corner. Each
+   side on its own, so a one-day run — the single cell being both the first and
+   the last — rounds at both ends rather than only the one declared later. */
+.strip__day:first-child {
+  border-top-left-radius: 11px;
+  border-bottom-left-radius: 11px;
+}
+
+.strip__day:last-child {
+  border-top-right-radius: 11px;
+  border-bottom-right-radius: 11px;
 }
 
 .strip__day--current {
@@ -485,7 +531,7 @@ button {
 }
 
 .strip__daynum {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
 }
@@ -507,38 +553,59 @@ button {
   pointer-events: none;
 }
 
+/* The playhead's handle. `left` is set in pixels from `tooltipAnchor`, which
+   holds the box inside the strip; the arrow is then placed within the box by
+   `--fv-arrow` so it goes on pointing at the playhead at either end. */
 .strip__label {
   position: absolute;
-  bottom: calc(100% + 14px);
+  bottom: calc(100% + 10px);
   transform: translateX(-50%);
   white-space: nowrap;
   background: #000;
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 8px;
-  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.strip__label--dragging {
+  cursor: grabbing;
 }
 
 .strip__label::after {
   content: "";
   position: absolute;
   top: 100%;
-  left: 50%;
+  left: var(--fv-arrow, 50%);
   margin-left: -5px;
   border: 5px solid transparent;
   border-top-color: #000;
 }
 
 @media (max-width: 720px) {
+  :root {
+    /* Two rows — the legend above the time control, as it was — and clear of
+       the map's own controls along the bottom. */
+    --fv-bar-total: calc(var(--fv-bar-h) + 22px + 8px);
+    --fv-bar-bottom: 96px;
+  }
   .rail {
     max-height: 40vh;
   }
+  /* Too narrow for three pills in a row, so the legend goes back on top. */
   .bottom {
-    bottom: 96px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
   }
-  .model {
-    bottom: 196px;
+  .bottom > .strip {
+    align-self: stretch;
+  }
+  .legend {
+    order: -1;
   }
 }
