@@ -384,8 +384,27 @@ const boundaries: LayerSpecification[] = [
 /**
  * Countries carry the map: uppercase, letter-spaced, regular weight. Quiet is
  * now the business of the letterforms rather than the colour — see `TEXT`.
- * Cities stay out of the continental view entirely and arrive at z5, where a
- * user has zoomed to a country and wants to find a place in it.
+ *
+ * Which name appears at which zoom is core's, ported from
+ * `config/static/basemap/georiva-basemap.json`: three rank tiers for countries
+ * and three for cities, each with its own window, rather than the two-tier
+ * split this had. A rank is OpenMapTiles' own judgement of a place's
+ * importance, and splitting on it is what lets a small country appear at all
+ * without the large ones shouting at the same size.
+ *
+ * `country-md` is the tier that makes a world view possible: exactly rank 2,
+ * drawn as the ISO code below z2 and as the name from z2. Core's trick, and
+ * the only way that tier fits across an ocean's width of screen.
+ *
+ * What did *not* come across from core is as deliberate as what did. Its type
+ * scale is nearly twice this one (country names to 24 px, ocean names to 30),
+ * which is a size for an inspection map rather than for names over a forecast.
+ * Its city dots are sprite icons and this style declares no sprite. Its
+ * states, villages, bays and river labels are a street map's worth of detail
+ * over the data. And its cities start at z1, where this style keeps them off:
+ * at a hemisphere of forecast a scatter of city names is clutter, and they
+ * arrive at z5, where a user has zoomed to a country and wants to find a place
+ * in it.
  */
 const placeLabels: LayerSpecification[] = [
   {
@@ -394,17 +413,45 @@ const placeLabels: LayerSpecification[] = [
     source: "openmaptiles",
     "source-layer": "place",
     minzoom: 1,
-    maxzoom: 8,
-    filter: places(["country"], [null, 2]),
+    maxzoom: 7,
+    filter: places(["country"], [null, 1]),
     layout: {
       "text-font": REGULAR,
       "text-field": NAME,
       "text-transform": "uppercase",
       "text-letter-spacing": 0.14,
+      // Narrower at the world view, where a wrapped name has nowhere to go.
+      "text-max-width": byZoom([
+        [0, 5],
+        [3, 6],
+      ]),
+      "text-size": byZoom([
+        [1, 8.5],
+        [6, 14],
+      ]),
+      ...BY_RANK,
+    },
+    paint: textPaint,
+  },
+  {
+    id: "country-md",
+    type: "symbol",
+    source: "openmaptiles",
+    "source-layer": "place",
+    minzoom: 1,
+    maxzoom: 8,
+    filter: places(["country"], [2, 2]),
+    layout: {
+      "text-font": REGULAR,
+      // The ISO code until there is room for the name. Uppercase and spaced
+      // like its neighbours, so a code reads as a label rather than a stub.
+      "text-field": ["step", ["zoom"], ["to-string", ["get", "iso_a2"]], 2, NAME] as ExpressionSpecification,
+      "text-transform": "uppercase",
+      "text-letter-spacing": 0.13,
       "text-max-width": 6,
       "text-size": byZoom([
-        [1, 10],
-        [6, 17],
+        [3, 8.5],
+        [8, 13],
       ]),
       ...BY_RANK,
     },
@@ -415,7 +462,7 @@ const placeLabels: LayerSpecification[] = [
     type: "symbol",
     source: "openmaptiles",
     "source-layer": "place",
-    minzoom: 2,
+    minzoom: 1,
     maxzoom: 10,
     filter: places(["country"], [3, null]),
     layout: {
@@ -426,8 +473,8 @@ const placeLabels: LayerSpecification[] = [
       "text-max-width": 6,
       "text-size": byZoom(
         [
-          [5, 10],
-          [9, 15],
+          [5, 8.5],
+          [9, 12.5],
         ],
         0.9,
       ),
@@ -449,8 +496,31 @@ const placeLabels: LayerSpecification[] = [
       "text-max-width": 7,
       "text-size": byZoom(
         [
-          [5, 12],
-          [12, 19],
+          [5, 10],
+          [12, 16],
+        ],
+        0.9,
+      ),
+      ...BY_RANK,
+    },
+    paint: textPaint,
+  },
+  {
+    id: "city-md",
+    type: "symbol",
+    source: "openmaptiles",
+    "source-layer": "place",
+    minzoom: 5,
+    maxzoom: 14,
+    filter: places(["city"], [3, 4]),
+    layout: {
+      "text-font": REGULAR,
+      "text-field": NAME,
+      "text-max-width": 7,
+      "text-size": byZoom(
+        [
+          [5, 9.5],
+          [12, 15],
         ],
         0.9,
       ),
@@ -463,17 +533,17 @@ const placeLabels: LayerSpecification[] = [
     type: "symbol",
     source: "openmaptiles",
     "source-layer": "place",
-    minzoom: 7,
+    minzoom: 6,
     maxzoom: 14,
-    filter: places(["city"], [3, null]),
+    filter: places(["city"], [5, null]),
     layout: {
       "text-font": REGULAR,
       "text-field": NAME,
       "text-max-width": 7,
       "text-size": byZoom(
         [
-          [7, 11],
-          [12, 17],
+          [7, 9.5],
+          [12, 14.5],
         ],
         0.9,
       ),
@@ -481,13 +551,62 @@ const placeLabels: LayerSpecification[] = [
     },
     paint: textPaint,
   },
+  {
+    // Towns arrive where a country fills the screen and a city name is no
+    // longer enough to say where you are.
+    id: "town",
+    type: "symbol",
+    source: "openmaptiles",
+    "source-layer": "place",
+    minzoom: 7,
+    maxzoom: 15,
+    filter: places(["town"], [null, null]),
+    layout: {
+      "text-font": REGULAR,
+      "text-field": NAME,
+      "text-max-width": 7,
+      "text-size": byZoom([
+        [7, 9],
+        [15, 13.5],
+      ]),
+      ...BY_RANK,
+    },
+    paint: textPaint,
+  },
+  {
+    // An island's name is often the only thing on screen that is not water,
+    // which is worth more here than it is on a street map.
+    id: "island",
+    type: "symbol",
+    source: "openmaptiles",
+    "source-layer": "place",
+    minzoom: 6,
+    maxzoom: 16,
+    filter: places(["island"], [null, null]),
+    layout: {
+      "text-font": REGULAR,
+      "text-field": NAME,
+      "text-max-width": 7,
+      "text-size": byZoom([
+        [10, 9],
+        [18, 13],
+      ]),
+      ...BY_RANK,
+    },
+    paint: textPaint,
+  },
 ];
 
 /**
- * Marine names, italic and widely spaced by the old convention. They do real
- * work here: with the sea the same grey as the land, a name is one of the few
- * cues left that you are looking at water. Oceans and seas only — bays crowd
- * the coast, which is where the data needs the room.
+ * Water names, italic by the old marine convention and spaced by how much room
+ * the body has. They do real work here: with the sea the same grey as the
+ * land, a name is one of the few cues left that you are looking at water.
+ *
+ * Italic means water, not "ocean or sea" — a distinction no reader would
+ * derive — so the lakes core labels come across on the same terms, at 0.05
+ * spacing because a lake name sits in a far smaller shape than an ocean's.
+ * Bays still stay out: they crowd the coast, which is where the data needs the
+ * room, and that was true before core's tiers arrived.
  *
  * Each tier arrives twice because OpenMapTiles gives the large bodies a line to
  * curve the text along as well as a point to sit on.
@@ -495,10 +614,11 @@ const placeLabels: LayerSpecification[] = [
 const ON_POINTS: ExpressionSpecification = ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false];
 const ON_LINES: ExpressionSpecification = ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false];
 
-const marineLabels: LayerSpecification[] = (
+const waterLabels: LayerSpecification[] = (
   [
-    ["ocean", ["ocean"], 0.25, [1, 5] as [number, number], [[1, 13], [4, 24]] as Stop[]],
-    ["sea", ["sea"], 0.15, [2, 8] as [number, number], [[2, 12], [5, 18]] as Stop[]],
+    ["ocean", ["ocean"], 0.25, [1, 5] as [number, number], [[1, 11], [4, 20]] as Stop[]],
+    ["sea", ["sea"], 0.15, [2, 8] as [number, number], [[2, 10], [5, 15]] as Stop[]],
+    ["lake", ["lake"], 0.05, [5, 16] as [number, number], [[5, 9], [10, 11.5], [16, 14]] as Stop[]],
   ] as const
 ).flatMap(([name, classes, spacing, [minzoom, maxzoom], size]) =>
   (["pt", "ln"] as const).map((shape): LayerSpecification => {
@@ -542,5 +662,5 @@ export const GREY_BASEMAP: StyleSpecification = {
     },
   },
   glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
-  layers: [...ground, anchor, ...shadow, ...boundaries, ...placeLabels, ...marineLabels],
+  layers: [...ground, anchor, ...shadow, ...boundaries, ...placeLabels, ...waterLabels],
 };
