@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
- * The palette of the drawn quantity as a bar, with a few of its stop values
- * and the unit. Everything on it comes from the variable's EDR description —
- * the stops, and the span to draw them over — so a palette edited in the admin
- * shows up here with no change in the app. The placing is `ui/legend.ts`.
+ * The palette of the drawn quantity as one compact pill: the unit at the left,
+ * then the ramp filling the rest of it edge to edge. Everything on it comes
+ * from the variable's EDR description — the stops, and the span to draw them
+ * over — so a palette edited in the admin shows up here with no change in the
+ * app. Which of the two shapes it takes, and every colour on it, is decided in
+ * `ui/legend.ts`; this only draws what that returns.
  */
 import { computed } from "vue";
 import { legendBar } from "../ui/legend";
@@ -14,16 +16,42 @@ const viewer = useViewer();
 const hints = computed(() => viewer.parameter.value?.["x-georiva"] ?? null);
 const unit = computed(() => viewer.parameter.value?.unit?.symbol ?? "");
 
-const bar = computed(() => legendBar(hints.value?.palette, hints.value?.palette_min, hints.value?.palette_max));
+const bar = computed(() =>
+  legendBar(hints.value?.palette, hints.value?.palette_min, hints.value?.palette_max, unit.value),
+);
 </script>
 
 <template>
   <div class="legend" v-if="bar">
-    <span class="legend__unit">{{ unit }}</span>
-    <div class="legend__bar" :style="{ background: bar.gradient }"></div>
-    <div class="legend__ticks">
-      <span v-for="t in bar.ticks" :key="t.value" class="legend__tick" :style="{ left: `${t.at}%` }">
-        {{ t.label }}
+    <span class="legend__unit" v-if="unit">{{ unit }}</span>
+
+    <!-- A classification: one block per class, its lower boundary on it. -->
+    <div class="legend__ramp" v-if="bar.kind === 'stepped'">
+      <div
+        v-for="band in bar.classes"
+        :key="band.value"
+        class="legend__class"
+        :style="{ background: band.colour, color: band.textColour }"
+        :title="band.title"
+      >
+        <span v-if="band.label" class="legend__value">{{ band.label }}</span>
+      </div>
+      <!-- The top of the range, on the last class's colour: the one boundary
+           no class begins at, and so the one that closes the scale. -->
+      <span class="legend__end" :style="{ background: bar.end.colour, color: bar.end.textColour }">
+        {{ bar.end.label }}
+      </span>
+    </div>
+
+    <!-- A ramp: the gradient, with a few values named on top of it. -->
+    <div class="legend__ramp legend__ramp--smooth" v-else :style="{ background: bar.gradient }">
+      <span
+        v-for="tick in bar.ticks"
+        :key="tick.value"
+        class="legend__tick"
+        :style="{ left: `${tick.at}%`, color: tick.textColour }"
+      >
+        {{ tick.label }}
       </span>
     </div>
   </div>
