@@ -493,14 +493,21 @@ button {
 }
 
 /* One line per cell: the day number and its weekday side by side. Two lines
-   is what made the control twice as tall as it needs to be. */
+   is what made the control twice as tall as it needs to be.
+
+   A grid rather than a flex row, for the one thing flex cannot do here:
+   baseline-aligned flex items are packed to the top of the line, so the pair
+   would sit against the cell's top edge. On a grid the two share a baseline
+   within their row and `align-content` then centres that row in the cell. */
 .strip__day {
   flex: 1 1 0;
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
   align-items: baseline;
+  align-content: center;
   justify-content: center;
-  gap: 5px;
+  column-gap: 5px;
   padding: 0;
   border: 0;
   border-right: 1px solid var(--fv-border);
