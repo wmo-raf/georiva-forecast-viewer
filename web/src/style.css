@@ -505,6 +505,25 @@ button {
   cursor: pointer;
 }
 
+/* The browser rings the select itself — a square blue box drawn inside a
+   rounded dark pill. The pill takes the focus instead, in its own colour and
+   its own shape, so the whole control lights up. Inset, so it reads as part
+   of the pill rather than a halo around it.
+
+   A select counts as focused-visible the moment it is clicked, not only when
+   it is tabbed to, so this shows on a click as well. That is the browser's
+   call and not ours to undo — which is the reason for making it look like
+   something we meant. */
+.run:has(.run__select:focus-visible) {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: -2px;
+}
+
+.run__select:focus,
+.run__select:focus-visible {
+  outline: none;
+}
+
 .run__chevron {
   position: absolute;
   right: 8px;
