@@ -40,12 +40,47 @@ const OPENFREEMAP = "https://tiles.openfreemap.org";
  * The greys, dead neutral (R=G=B). A cast of any kind would tint the data
  * sitting on top of it, and the point of this ground is that it does not.
  */
-/** Land and ocean both. One tone, everywhere. */
+/** Land, ocean and lake alike. One tone, everywhere — no body of water has a fill. */
 const GROUND = "#8c8c8c";
-/** Lakes and the larger rivers: water, said in grey. */
-const INLAND_WATER = "#7a7a7a";
+/**
+ * The larger rivers. A step lighter than `LINE`, on purpose: a coastline is a
+ * hard boundary you read the map by, a river is a landscape cue, and giving
+ * them the same grey would make the Nile speak as loudly as the Somali coast.
+ */
+const RIVER = "#7a7a7a";
 /** The shore and the borders: darker than the ground, which is what makes them read. */
 const LINE = "#6b6b6b";
+/**
+ * The shore's shadow. Black rather than a named grey: it darkens whatever is
+ * beneath it by a proportion, so it stays right if the ground above ever moves,
+ * where a grey would be a hard-coded relationship between two constants.
+ */
+const SHADOW = "#000000";
+const SHADOW_OPACITY = 0.2;
+/**
+ * How wide the band is, in screen pixels. It grows with zoom because a shadow
+ * of a fixed width stops reading as depth and starts reading as a stroke. The
+ * low end is deliberately small: at z0–z2 a wide band on two facing shores
+ * merges and closes up the narrow seas, the Red Sea first.
+ */
+const SHADOW_WIDTH: Stop[] = [
+  [2, 4],
+  [5, 12],
+  [9, 24],
+];
+/**
+ * How far the band is pushed off the shore and into the water, in the same
+ * screen pixels — half the width, so the band's outer edge lands on the shore
+ * itself rather than across it.
+ *
+ * `line-offset` shifts perpendicular to the direction of travel, and the vector
+ * tile spec winds exterior rings clockwise and interior rings the other way, so
+ * one sign puts the band inside the water polygon everywhere: seaward of a
+ * coast, inside a lake, and — because a hole's winding is reversed — still in
+ * the water around an island. The sign was settled by looking at the rendered
+ * pixels, not by reasoning about the three conventions it depends on.
+ */
+const SHADOW_OFFSET: Stop[] = SHADOW_WIDTH.map(([zoom, width]) => [zoom, width / 2]);
 
 /**
  * Labels are dark on a light ground and carry no visible halo — but they *do*
@@ -91,24 +126,26 @@ const textPaint = {
 };
 
 /**
- * The ground: one grey, the inland water a step darker over it, and the larger
- * rivers once there is room for them. `ocean` is deliberately absent from the
- * water filter — the sea is the background. Tunnelled water is dropped too: a
- * culvert drawn as a river is just a wrong line.
+ * The ground: one grey, the larger rivers once there is room for them, and a
+ * shadow in the water along every shore. Tunnelled water is dropped: a culvert
+ * drawn as a river is just a wrong line.
+ *
+ * No body of water has a fill. Not the ocean, and not the lakes either — a
+ * lake is the same grey as the sea and the land, and what makes it read as
+ * water is the shadow inside its own shore, exactly as for a coast.
+ *
+ * That shadow is the one piece of sleight of hand here. MapLibre has no drop
+ * shadow, but a wide line with `line-blur` set to its own width degenerates
+ * into a pure gradient, and `line-offset` pushes that gradient off the shore
+ * and into the water. It is drawn last in this group so nothing in the ground
+ * can paint over it — an earlier version put it first, behind an opaque ocean
+ * fill, and rendered nothing at all.
  */
 const ground: LayerSpecification[] = [
   {
     id: "ground",
     type: "background",
     paint: { "background-color": GROUND },
-  },
-  {
-    id: "lake",
-    type: "fill",
-    source: "openmaptiles",
-    "source-layer": "water",
-    filter: ["all", ["==", ["get", "class"], "lake"], ["!=", ["get", "brunnel"], "tunnel"]],
-    paint: { "fill-color": INLAND_WATER, "fill-antialias": true },
   },
   {
     id: "waterway",
@@ -119,7 +156,7 @@ const ground: LayerSpecification[] = [
     filter: ["all", ["match", ["get", "class"], ["river", "canal"], true, false], ["!=", ["get", "brunnel"], "tunnel"]],
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
-      "line-color": INLAND_WATER,
+      "line-color": RIVER,
       "line-width": byZoom([
         [5, 0.5],
         [10, 1.4],
@@ -129,6 +166,23 @@ const ground: LayerSpecification[] = [
         [5, 0.5],
         [8, 1],
       ]),
+    },
+  },
+  {
+    // Mirrors `coastline`'s filter exactly: the line and its shadow must never
+    // come to disagree about where the shore is.
+    id: "shore-shadow",
+    type: "line",
+    source: "openmaptiles",
+    "source-layer": "water",
+    filter: ["match", ["get", "class"], ["ocean", "lake"], true, false],
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": SHADOW,
+      "line-opacity": SHADOW_OPACITY,
+      "line-width": byZoom(SHADOW_WIDTH),
+      "line-blur": byZoom(SHADOW_WIDTH),
+      "line-offset": byZoom(SHADOW_OFFSET),
     },
   },
 ];

@@ -12,6 +12,8 @@ import { DATA_ANCHOR_ID, GREY_BASEMAP } from "./basemap";
 
 const ids = GREY_BASEMAP.layers.map((layer) => layer.id);
 const indexOf = (id: string) => ids.indexOf(id);
+const layerOf = (id: string) => GREY_BASEMAP.layers.find((layer) => layer.id === id) as { filter?: unknown };
+const paintOf = (id: string) => (layerOf(id) as unknown as { paint: Record<string, unknown> }).paint;
 
 describe("the data anchor", () => {
   /**
@@ -23,7 +25,7 @@ describe("the data anchor", () => {
     const anchor = indexOf(DATA_ANCHOR_ID);
     expect(anchor).toBeGreaterThan(-1);
 
-    const ground = ["ground", "lake", "waterway"];
+    const ground = ["ground", "waterway", "shore-shadow"];
     const over = ["coastline", "boundary-country", "boundary-disputed", "boundary-state"];
     const names = GREY_BASEMAP.layers.filter((layer) => layer.type === "symbol").map((layer) => layer.id);
 
@@ -35,6 +37,41 @@ describe("the data anchor", () => {
   it("is invisible, so it changes nothing but the order", () => {
     const anchor = GREY_BASEMAP.layers.find((layer) => layer.id === DATA_ANCHOR_ID);
     expect(anchor).toMatchObject({ type: "background", paint: { "background-opacity": 0 } });
+  });
+});
+
+describe("the shore shadow", () => {
+  /**
+   * It goes last in the ground, so nothing there can paint over it. An earlier
+   * version put it first, behind an opaque ocean fill, and drew nothing at all
+   * — no error, no warning, just a shore with no shadow.
+   */
+  it("is the last thing drawn in the ground", () => {
+    const anchor = indexOf(DATA_ANCHOR_ID);
+    expect(indexOf("shore-shadow")).toBe(anchor - 1);
+  });
+
+  /** A shadow you can see the edge of is a stroke; the blur is what makes it one. */
+  it("blurs by as much as it is wide", () => {
+    const paint = paintOf("shore-shadow");
+    expect(paint["line-blur"]).toEqual(paint["line-width"]);
+  });
+
+  /**
+   * Without the offset the band straddles the shore and darkens the land too.
+   * The sign cannot be checked here — only rendered pixels settle which side of
+   * the shore it lands on — but its absence can.
+   */
+  it("is pushed off the shore and into the water", () => {
+    const offset = paintOf("shore-shadow")["line-offset"] as unknown[];
+    expect(offset).toBeDefined();
+    const values = offset.slice(3).filter((_, i) => i % 2 === 1) as number[];
+    expect(values.every((v) => v > 0)).toBe(true);
+  });
+
+  /** The line and its shadow must agree about where the shore is. */
+  it("follows the same water as the coastline", () => {
+    expect(layerOf("shore-shadow").filter).toEqual(layerOf("coastline").filter);
   });
 });
 
