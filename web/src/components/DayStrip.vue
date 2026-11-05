@@ -174,42 +174,47 @@ onBeforeUnmount(() => {
 <template>
   <div class="strip" v-if="cells.length">
     <RunPicker />
-    <button
-      type="button"
-      class="strip__play"
-      :aria-label="viewer.state.playing ? 'Pause' : 'Play'"
-      @click="viewer.setPlaying(!viewer.state.playing)"
-    >
-      <Pause v-if="viewer.state.playing" :size="16" aria-hidden="true" />
-      <Play v-else :size="16" aria-hidden="true" />
-    </button>
-    <div class="strip__days" ref="daysEl" @pointerdown="grabDays">
-      <!-- The handle: pointer only. The chevrons and the day cells below are
-           the keyboard's way through the run, so this claims no role it does
-           not implement. It stops announcing mid-drag, which would otherwise
-           read out every step the hand crosses. -->
-      <div
-        class="strip__label"
-        :class="{ 'strip__label--dragging': dragging }"
-        ref="labelEl"
-        :style="{ left: `${anchor.left}px`, '--fv-arrow': `${anchor.arrow}px` }"
-        :aria-live="dragging ? 'off' : 'polite'"
-        @pointerdown="grabLabel"
-      >
-        {{ label }}
-      </div>
+    <!-- Play and the days travel together: when the run pill can no longer
+         share a line with them, this pair wraps below it rather than the days
+         being squeezed to nothing. -->
+    <div class="strip__timeline">
       <button
-        v-for="(cell, i) in cells"
-        :key="cell.key"
         type="button"
-        class="strip__day"
-        :class="{ 'strip__day--current': cell === current }"
-        @click="pickInCell(i, $event)"
+        class="strip__play"
+        :aria-label="viewer.state.playing ? 'Pause' : 'Play'"
+        @click="viewer.setPlaying(!viewer.state.playing)"
       >
-        <span class="strip__daynum">{{ cell.day }}</span>
-        <span class="strip__weekday">{{ cell.weekday }}</span>
+        <Pause v-if="viewer.state.playing" :size="16" aria-hidden="true" />
+        <Play v-else :size="16" aria-hidden="true" />
       </button>
-      <div class="strip__playhead" :style="{ left: `${playhead * 100}%` }"></div>
+      <div class="strip__days" ref="daysEl" @pointerdown="grabDays">
+        <!-- The handle: pointer only. The day cells below are the keyboard's
+             way through the run, so this claims no role it does not
+             implement. It stops announcing mid-drag, which would otherwise
+             read out every step the hand crosses. -->
+        <div
+          class="strip__label"
+          :class="{ 'strip__label--dragging': dragging }"
+          ref="labelEl"
+          :style="{ left: `${anchor.left}px`, '--fv-arrow': `${anchor.arrow}px` }"
+          :aria-live="dragging ? 'off' : 'polite'"
+          @pointerdown="grabLabel"
+        >
+          {{ label }}
+        </div>
+        <button
+          v-for="(cell, i) in cells"
+          :key="cell.key"
+          type="button"
+          class="strip__day"
+          :class="{ 'strip__day--current': cell === current }"
+          @click="pickInCell(i, $event)"
+        >
+          <span class="strip__daynum">{{ cell.day }}</span>
+          <span class="strip__weekday">{{ cell.weekday }}</span>
+        </button>
+        <div class="strip__playhead" :style="{ left: `${playhead * 100}%` }"></div>
+      </div>
     </div>
   </div>
   <div class="strip strip--empty" v-else-if="viewer.state.timeline">No complete run yet for this model.</div>

@@ -15,7 +15,15 @@
      `--fv-bar-total` the whole bar's, which is the same until it wraps onto
      two rows on a narrow viewport. */
   --fv-bar-h: 32px;
+  /* The bar's measured height, written by `App.vue` from the footer itself:
+     it wraps onto two and three rows as the width allows, and nothing in CSS
+     can see which. Anything standing clear of the bar reads this. The value
+     here is the one-row case, used until the first measurement lands. */
   --fv-bar-total: var(--fv-bar-h);
+  /* The narrowest the days are worth drawing: below this the run pill gives
+     up its place on the line. Three cells of a two-digit date need about
+     170px, so this leaves room to spare at the moment it wraps. */
+  --fv-days-min: 260px;
   /* MapLibre's compact credit in the bottom-right corner: the 24px ⓘ and the
      10px margin it keeps around itself. Its expanded form is wider but no
      taller, so standing above this band clears the credit either way. */
@@ -400,13 +408,28 @@ button {
 }
 
 /* Layout only — no background, no border, no padding. The chrome belongs to
-   the two pills inside it, which is what puts the play buttons outside the
-   days rather than in a frame around them. */
+   the pills inside it, which is what puts the play button outside the days
+   rather than in a frame around them.
+
+   It wraps, so the run pill takes a line of its own as soon as the timeline
+   beside it would be squeezed past `--fv-days-min`. No breakpoint decides
+   that: the width available does, whatever is eating it. */
 .strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 8px;
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Play and the days as one item, so it is the pair that wraps below the run
+   pill rather than the days alone being left behind by it. */
+.strip__timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex: 1 1 var(--fv-days-min);
   min-width: 0;
 }
 
@@ -638,8 +661,6 @@ button {
 
 @media (max-width: 720px) {
   :root {
-    /* Two rows: the legend above the time control, as it was. */
-    --fv-bar-total: calc(var(--fv-bar-h) + 22px + 8px);
     /* The credit, and then the handle, which hangs below the days here. */
     --fv-bar-bottom: calc(var(--fv-attrib-h) + 10px + 34px);
   }
