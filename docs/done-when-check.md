@@ -209,3 +209,23 @@ exits 0 with no output. Core's parser is right about which key it reads; it is
 wrong to say nothing when a manifest asks for nothing. Smaller than the two
 above, and a one-line `WARNING` on the `stderr` channel the parser already uses
 for `SKIP` and for the no-source warning would close it.
+
+## Since this walk — 2026-11-05, the basemap
+
+The external-traffic finding above was true when it was made and is left
+standing as the record of that walk. It no longer describes the viewer.
+
+The built-in default basemap style URL it names — the one string in `src/`
+besides the five GeoRiva routes, pointing at `basemaps.cartocdn.com` — is gone,
+and with it the `basemap_style_url` setting that let an organisation replace
+it. The viewer now carries one style of its own in `web/src/map/basemap.ts`,
+bundled into the app rather than fetched, so a cold load makes **no style
+request at all**. The external host is now `tiles.openfreemap.org`, for tiles
+and glyphs only; no sprite is fetched, because nothing in the style draws an
+icon. Re-run the audit's `grep` and the five GeoRiva routes now stand alone,
+with the OpenFreeMap URLs reachable only through that one module.
+
+Two things the walk's reasoning still holds for: the bundle assembles no URL of
+its own outside `addresses.ts`, and nothing the basemap touches carries a
+credential or a session assumption — the OpenFreeMap source is declared by its
+TileJSON URL, which is also where its attribution comes from.

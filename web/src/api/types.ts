@@ -9,7 +9,6 @@ export interface Catalogue {
 export interface ViewerConfig {
   org: string;
   org_name: string;
-  basemap_style: string | null;
   default_view: { center: [number, number]; zoom: number };
 }
 

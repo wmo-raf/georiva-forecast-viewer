@@ -164,6 +164,5 @@ class CatalogueVisibilityTests(TestCase):
         body = self.client.get(reverse(URL)).json()
         self.assertEqual(body["config"]["org"], DEFAULT_TEST_ORG_SLUG)
         self.assertEqual(body["config"]["org_name"], DEFAULT_TEST_ORG_SLUG)
-        self.assertEqual(body["config"]["basemap_style"], None)
         self.assertEqual(body["config"]["default_view"], {"center": [20.0, 0.0], "zoom": 3.0})
         self.assertEqual(body["quantities"], [])

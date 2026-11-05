@@ -36,7 +36,10 @@ GeoRiva's process and talks to it over public HTTP routes only.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
-- **Settings** — basemap style and the opening view, per organisation.
+- **Settings** — the opening view, per organisation. Not the basemap: the viewer
+  ships one style of its own (`web/src/map/basemap.ts`), a flat neutral grey
+  with no ocean fill, chosen to carry value-encoded rasters and white wind
+  trails, and it cannot be replaced.
 
 Admin: *Forecast viewer → Quantities / Sources* (bindings inline on a source),
 and *Settings → Forecast viewer settings*.
@@ -45,7 +48,7 @@ and *Settings → Forecast viewer settings*.
 
 ```json
 {
-  "config": {"org": "kmd", "basemap_style": null, "default_view": {"center": [20.0, 0.0], "zoom": 3.0}},
+  "config": {"org": "kmd", "org_name": "KMD", "default_view": {"center": [20.0, 0.0], "zoom": 3.0}},
   "quantities": [
     {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "sources": [
       {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m"},

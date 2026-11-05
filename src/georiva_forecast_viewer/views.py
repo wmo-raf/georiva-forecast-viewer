@@ -29,7 +29,6 @@ def describe_config(organisation):
     return {
         "org": organisation.slug,
         "org_name": organisation.name,
-        "basemap_style": settings.basemap_style_url or None,
         "default_view": {
             "center": [settings.default_longitude, settings.default_latitude],
             "zoom": settings.default_zoom,
