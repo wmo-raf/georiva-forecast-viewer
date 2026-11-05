@@ -174,6 +174,21 @@ describe("the blocks a classification draws", () => {
     expect(only[0]).toMatchObject({ value: 0, label: "0", title: "0 – 50" });
   });
 
+  it("reads past a closing stop for everything above the range", () => {
+    // Real palettes end with the colour for values off the top, declared as one
+    // stop at the top itself: it names no interval and covers no area on the
+    // map, so it is a boundary of the classification and not a class in it.
+    const closed: PaletteStop[] = [...RAIN, [20, [139, 0, 0]]];
+    const drawn = stepped(closed).classes;
+    expect(drawn.map((band) => band.value)).toEqual([0, 1, 5]);
+    expect(drawn.at(-1)?.title).toBe("5 – 20");
+  });
+
+  it("reads past an opening stop below the range too", () => {
+    const opened: PaletteStop[] = [[0, [10, 10, 10]], ...RAIN];
+    expect(stepped(opened).classes.map((band) => band.value)).toEqual([0, 1, 5]);
+  });
+
   it("leaves a ramp that merely repeats a colour as a ramp", () => {
     // Two stops of one colour are only a class when they span values; a ramp
     // with a repeated colour at a single point is still a ramp.

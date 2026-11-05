@@ -131,12 +131,24 @@ function runs(stops: PaletteStop[]): Run[] {
 }
 
 /**
- * Whether these runs are a classification rather than a ramp: every one of them
- * covers a span of values, which is what core's stepped mode produces and what
- * a ramp — one stop per colour — never does.
+ * These runs as a class list, or null where they are a ramp rather than a
+ * classification. A class covers a span of values, which is what core's stepped
+ * mode produces and what a ramp — one stop per colour — never does.
+ *
+ * A run of no span at either end is dropped before that is judged. Palettes in
+ * the wild close with the colour for everything above the top of the range,
+ * declared as a single stop at that top; it names no interval, covers no area
+ * on the map, and is a boundary of the classification rather than a class in
+ * it. A ramp survives this untouched: dropping its ends only ever leaves the
+ * interior stops, which have no span either.
  */
-function stepped(folded: Run[]): boolean {
-  return folded.length > 0 && folded.every((run) => run.high > run.low);
+function classification(folded: Run[]): Run[] | null {
+  let first = 0;
+  let last = folded.length - 1;
+  if (folded[first] && folded[first].high === folded[first].low) first += 1;
+  if (last >= first && folded[last].high === folded[last].low) last -= 1;
+  const classes = folded.slice(first, last + 1);
+  return classes.length > 0 && classes.every((run) => run.high > run.low) ? classes : null;
 }
 
 /** The colour of a ramp at `value`, interpolated between its bracketing stops. */
@@ -211,8 +223,8 @@ export function legendBar(
 ): Legend | null {
   if (!palette || palette.length === 0) return null;
   const stops = sorted(palette);
-  const folded = runs(stops);
-  if (stepped(folded)) return steppedLegend(folded, unit);
+  const classes = classification(runs(stops));
+  if (classes) return steppedLegend(classes, unit);
 
   const values = stops.map(([value]) => value);
   const low = typeof min === "number" ? min : Math.min(...values);
