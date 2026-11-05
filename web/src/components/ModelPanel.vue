@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * "Select model", bottom right: the sources bound to the selected quantity,
- * and inside the same panel the run, because a run belongs to a model and is
- * changed rarely.
+ * "Select model", bottom right: the sources bound to the selected quantity.
+ * The run lives in the bar, beside the timeline it governs — see `RunPicker`.
  */
 import { ChevronUp } from "lucide-vue-next";
 import { computed, ref } from "vue";
@@ -17,15 +16,6 @@ const sources = computed(() =>
     ? sourcesFor(viewer.scalarView.value, viewer.state.selection.quantity)
     : [],
 );
-const runs = computed(() => viewer.state.timeline?.runs ?? []);
-const selectedRun = computed(() => viewer.state.timeline?.selected ?? "");
-
-function formatRun(iso: string): string {
-  const d = new Date(iso);
-  const day = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-  return `${day} ${String(d.getUTCHours()).padStart(2, "0")}:00 UTC`;
-}
-
 function pick(slug: string) {
   viewer.pickSource(slug);
   open.value = false;
@@ -55,17 +45,6 @@ function pick(slug: string) {
         <span class="model__name">{{ s.name }}</span>
         <span v-if="s.descriptor" class="model__descriptor">{{ s.descriptor }}</span>
       </button>
-      <div class="model__heading" v-if="runs.length">Run</div>
-      <select
-        v-if="runs.length"
-        class="model__run"
-        :value="selectedRun"
-        aria-label="Run"
-        @change="viewer.pickRun(($event.target as HTMLSelectElement).value)"
-      >
-        <option v-for="r in runs" :key="r.reference_time" :value="r.reference_time">{{ formatRun(r.reference_time) }}</option>
-      </select>
-      <div v-else-if="viewer.state.timeline" class="model__note">No complete run yet.</div>
     </div>
   </div>
 </template>

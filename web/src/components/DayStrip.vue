@@ -26,6 +26,7 @@ import {
   tooltipAnchor,
 } from "../state/daystrip";
 import { useViewer } from "../state/store";
+import RunPicker from "./RunPicker.vue";
 
 const viewer = useViewer();
 const props = defineProps<{ frameReady: boolean }>();
@@ -172,6 +173,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="strip" v-if="cells.length">
+    <RunPicker />
     <button
       type="button"
       class="strip__play"

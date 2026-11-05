@@ -276,24 +276,6 @@ button {
   background: rgba(47, 182, 201, 0.22);
 }
 
-.model__run {
-  width: 100%;
-  margin: 2px 0 4px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--fv-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fv-fg);
-  font: inherit;
-  font-size: 13px;
-}
-
-.model__note {
-  font-size: 12px;
-  color: var(--fv-muted);
-  padding: 4px 8px 8px;
-}
-
 /* ---- legend ---- */
 
 /* One pill, no padding of its own: the colour reaches its edge and the
@@ -441,6 +423,76 @@ button {
   font-size: 13px;
   color: var(--fv-muted);
 }
+
+/* ---- run picker ---- */
+
+/* The run, at the head of the bar: the days pill's chrome, with no padding of
+   its own so the label reaches the edge and the rounding clips it. The bar now
+   carries two times, the run and the step, so this one is named — a bare time
+   here would read as the one on the map. */
+.run {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  height: var(--fv-bar-h);
+  box-sizing: border-box;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.run__eyebrow {
+  display: flex;
+  align-items: center;
+  /* Asymmetric: the left side has the pill's own rounding to clear. */
+  padding: 0 8px 0 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fv-muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* One run and several read as the same pill. The only difference is the
+   chevron, and the room kept for it, both of which exist only when there is
+   something to choose. */
+.run__value {
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.run__select {
+  height: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fv-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 26px 0 10px;
+  cursor: pointer;
+}
+
+.run__chevron {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fv-muted);
+  /* The select is underneath and must take the click. */
+  pointer-events: none;
+}
+
+/* ---- the time control ---- */
 
 /* The one control, floating to the left of the days as a circle of the bar's
    own height. It is filled rather than panelled: it is the only thing to
