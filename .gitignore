@@ -16,6 +16,21 @@ node_modules/
 web/dist/
 .env
 
+# The shore shadow: neither its source data nor its output belongs in git.
+#
+# The pyramid is 15,088 files and 55 MB — a binary artefact that would be in
+# every clone of this repository forever, re-added wholesale on every
+# re-render, and reviewable by nobody. It is a pure function of the renderer
+# and of Natural Earth, both of which *are* in git, so the repository carries
+# the recipe and each machine makes its own copy: a developer with
+# `tools/build_shore_shadow.py`, a server with `georiva render_shore_shadow`.
+# docs/shore-shadow.md has both.
+#
+# The Natural Earth zips are ignored for the older, simpler reason: nothing
+# but a re-render reads them, and a re-render can fetch them again.
+web/public/shore-shadow/
+.natural-earth/
+
 # The built web bundle. It is committed exactly once per release, on the
 # detached commit a tag points at, by .github/workflows/release.yml with
 # `git add -f` — never on main, where a minified bundle would make every diff

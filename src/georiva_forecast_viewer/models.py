@@ -227,17 +227,32 @@ class QuantityBinding(models.Model):
 
 @register_setting(icon="globe")
 class ForecastViewerSettings(BaseSiteSetting):
-    """How the map opens: the basemap and the first view. Per Site, which is the organisation."""
+    """How the map opens: the first view. Per Site, which is the organisation.
+
+    The basemap is not among these. The viewer ships one style of its own
+    (``web/src/map/basemap.ts``) and offers no way to replace it: a style chosen
+    to carry value-encoded rasters and white wind trails is part of how the
+    viewer reads, not a preference.
+    """
 
     ORGANISATION_LOOKUP = "site__organisation"
 
-    basemap_style_url = models.URLField(
-        blank=True,
-        help_text="A MapLibre style JSON URL. Leave blank for the viewer's built-in default.",
-    )
     default_longitude = models.FloatField(default=20.0, help_text="Centre of the map when the viewer opens.")
     default_latitude = models.FloatField(default=0.0, help_text="Centre of the map when the viewer opens.")
     default_zoom = models.FloatField(default=3.0, help_text="Zoom level when the viewer opens.")
+    #: The one piece of the basemap an operator may switch, because it is the
+    #: one piece that is not shipped. The tiles are rendered on the machine
+    #: that serves them (``georiva render_shore_shadow``), so the honest
+    #: default is off: a site that has not rendered should ask for no tiles
+    #: rather than 404 on every one of them. Everything else about the style
+    #: stays unconfigurable, for the reason the class docstring gives.
+    shore_shadow = models.BooleanField(
+        default=False,
+        verbose_name="Draw the shore's shadow",
+        help_text=(
+            "A soft dark band in the water along every shore; needs `georiva render_shore_shadow` on the server first."
+        ),
+    )
 
     class Meta:
         verbose_name = "Forecast viewer settings"

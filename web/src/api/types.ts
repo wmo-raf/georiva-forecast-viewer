@@ -9,8 +9,14 @@ export interface Catalogue {
 export interface ViewerConfig {
   org: string;
   org_name: string;
-  basemap_style: string | null;
   default_view: { center: [number, number]; zoom: number };
+  /**
+   * Draw the shore's shadow: true only when this organisation switched it on
+   * *and* the pyramid is on the server's disk. The tiles are rendered there
+   * rather than shipped in this bundle, so both have to be true before the
+   * style may ask for one.
+   */
+  shore_shadow: boolean;
 }
 
 export type QuantityKind = "scalar" | "vector";

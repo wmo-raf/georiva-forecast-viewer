@@ -15,9 +15,15 @@ GET /api/forecast-viewer/     # the quantities and sources this caller may see, 
 georiva-forecast-viewer/
 ├── pyproject.toml
 ├── docs/                          # notes on checks that need a running stack
+├── tools/                         # one-off renderers, run by hand; output is never committed
 ├── src/georiva_forecast_viewer/   # the plugin: models, admin, the catalogue route
+│   ├── shore_shadow.py            # …and the basemap's tile renderer, with
+│   │   pyramid.py                 #   the pyramid around it: `georiva
+│   │                              #   render_shore_shadow` on a server, the
+│   │                              #   tools/ script in development
 │   └── static/forecast_viewer/    # the built web bundle, committed on release
 └── web/                           # the user interface source (Vite + Vue 3 + TypeScript)
+    └── public/shore-shadow/       # the basemap's shore-shadow tiles, ours
 ```
 
 The repo root is the plugin, as the plugin installer requires. `web/` is built
@@ -36,7 +42,14 @@ GeoRiva's process and talks to it over public HTTP routes only.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
-- **Settings** — basemap style and the opening view, per organisation.
+- **Settings** — the opening view, per organisation. Not the basemap: the viewer
+  ships one style of its own (`web/src/map/basemap.ts`), a flat neutral grey
+  with no ocean fill, chosen to carry value-encoded rasters and white wind
+  trails, and it cannot be replaced. Land and sea being the same grey, the only
+  thing separating them is a coastline and the soft shadow in the water beside
+  it — raster tiles rendered from Natural Earth and shipped inside the bundle
+  ([`docs/shore-shadow.md`](docs/shore-shadow.md)). Everything the viewer draws
+  comes from GeoRiva or OpenFreeMap; no other host is reached.
 
 Admin: *Forecast viewer → Quantities / Sources* (bindings inline on a source),
 and *Settings → Forecast viewer settings*.
@@ -45,7 +58,7 @@ and *Settings → Forecast viewer settings*.
 
 ```json
 {
-  "config": {"org": "kmd", "basemap_style": null, "default_view": {"center": [20.0, 0.0], "zoom": 3.0}},
+  "config": {"org": "kmd", "org_name": "KMD", "default_view": {"center": [20.0, 0.0], "zoom": 3.0}},
   "quantities": [
     {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "sources": [
       {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m"},

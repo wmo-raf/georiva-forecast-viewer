@@ -46,6 +46,18 @@ boost is capped, which bites only on a world view of a small domain — where a
 trail is already several times the domain's width and the particles read as
 dense regardless.
 
+## The basemap
+
+One style of its own, in `src/map/basemap.ts`: flat neutral grey, no ocean
+fill, nothing coloured, so every colour on screen belongs to the data. Vector
+tiles and glyphs come from OpenFreeMap; the soft shadow in the water along
+every shore is raster tiles of our own, rendered from Natural Earth by
+`../tools/build_shore_shadow.py` into `public/shore-shadow/`, which is
+gitignored and rendered per machine rather than committed — see
+[`../docs/shore-shadow.md`](../docs/shore-shadow.md). Those two are the whole
+of what this bundle fetches from outside GeoRiva, and a test in
+`basemap.test.ts` fails on any third host appearing in the style.
+
 ## Layout
 
 - Left rail (`Rail.vue`): the organisation's name, the scalar quantities with

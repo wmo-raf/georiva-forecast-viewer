@@ -4,6 +4,14 @@
  * selected scalar quantity as a WeatherLayers raster, and the same model's
  * 10 m wind as animated particles.
  *
+ * The basemap is the viewer's own, bundled rather than fetched (`map/basemap.ts`):
+ * one dark grey ground, no variants, no operator override. Both deck layers
+ * insert before its `georiva-data-anchor`, so the data draws above the ground
+ * and below the shore's shadow, the borders and the names. Both carry the same
+ * `beforeId` and so share one layer group: deck inserts them at a single point
+ * in the style, and nothing in the basemap can be placed between the raster
+ * and the particles.
+ *
  * Both come from value-encoded textures derived per request (core's ADR 0021),
  * one band for the scalar and two for the wind pair (core's #593). Values, not
  * colours: the palette from EDR is applied on the GPU, so a palette change
@@ -21,20 +29,19 @@ import { MapLibreOverlay } from "@deck.gl/maplibre";
 // its worker from a real URL, which `import.meta.url` cannot resolve inside
 // Vite's module graph.
 import * as maplibregl from "maplibre-gl";
-import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
+import { setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { ViewerConfig } from "../api/types";
+import { DATA_ANCHOR_ID, greyBasemap } from "../map/basemap";
 import { particleCount, type Bounds } from "../map/particles";
 import { loadTexture, type Texture } from "../map/texture";
 import { useViewer } from "../state/store";
 
 setWorkerUrl(workerUrl);
 
-/** A muted dark basemap so the data colours carry the picture; the settings model can replace it. */
-const DEFAULT_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const LAYER_ID = "forecast-raster";
 const WIND_LAYER_ID = "forecast-wind";
 
@@ -66,7 +73,6 @@ const container = ref<HTMLDivElement | null>(null);
 const viewport = ref<Bounds | null>(null);
 let map: maplibregl.Map | null = null;
 let overlay: MapLibreOverlay | null = null;
-let labelsLayerId: string | undefined;
 
 /** One texture under one URL: what is drawn, whether a newer frame is in flight, and the last failure. */
 interface Slot {
@@ -88,7 +94,7 @@ function windLayers() {
   return [
     new ParticleLayer({
       id: WIND_LAYER_ID,
-      beforeId: labelsLayerId,
+      beforeId: DATA_ANCHOR_ID,
       image: current.image,
       // The texture's own extent, which is the WRF domain for a regional model
       // and the world for IFS: the layer freezes every particle outside it.
@@ -115,7 +121,7 @@ function layers() {
   return [
     new RasterLayer({
       id: LAYER_ID,
-      beforeId: labelsLayerId,
+      beforeId: DATA_ANCHOR_ID,
       image: current.image,
       bounds: current.bounds,
       imageUnscale: current.unscale,
@@ -188,7 +194,9 @@ onMounted(() => {
   if (!container.value) return;
   map = new maplibregl.Map({
     container: container.value,
-    style: props.config.basemap_style ?? DEFAULT_STYLE,
+    // The shadow is in the style only if this organisation switched it on and
+    // the server it came from has the tiles; the catalogue answers both as one.
+    style: greyBasemap({ shoreShadow: props.config.shore_shadow }),
     center: props.config.default_view.center,
     zoom: props.config.default_view.zoom,
     attributionControl: { compact: true },
@@ -201,8 +209,6 @@ onMounted(() => {
     repaint();
   });
   map.once("load", () => {
-    const style = map!.getStyle() as StyleSpecification;
-    labelsLayerId = style.layers.find((l) => l.type === "symbol")?.id;
     readViewport();
     overlay = new MapLibreOverlay({ interleaved: true, layers: layers() });
     map!.addControl(overlay);

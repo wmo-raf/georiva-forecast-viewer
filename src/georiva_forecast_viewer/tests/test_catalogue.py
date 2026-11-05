@@ -6,15 +6,19 @@ see is absent, not forbidden, and another organisation's rows never appear
 however they are named.
 """
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import ANY
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from wagtail.models import Site
 
 from georiva.core.machine_plane.addresses import render_config_token, vector_render_config_token
-from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, dial_org, join_org
-from georiva_forecast_viewer.models import Quantity
+from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, dial_org, join_org, org_host
+from georiva_forecast_viewer.models import ForecastViewerSettings, Quantity
+from georiva_forecast_viewer.pyramid import pyramid_in
 
 from .factories import WRF_VARIABLES, bind, make_collection, make_quantity, make_source
 
@@ -164,6 +168,53 @@ class CatalogueVisibilityTests(TestCase):
         body = self.client.get(reverse(URL)).json()
         self.assertEqual(body["config"]["org"], DEFAULT_TEST_ORG_SLUG)
         self.assertEqual(body["config"]["org_name"], DEFAULT_TEST_ORG_SLUG)
-        self.assertEqual(body["config"]["basemap_style"], None)
         self.assertEqual(body["config"]["default_view"], {"center": [20.0, 0.0], "zoom": 3.0})
         self.assertEqual(body["quantities"], [])
+
+
+class ShoreShadowTests(TestCase):
+    """The shadow is reported only when it is both wanted and there.
+
+    Its tiles are rendered on the server (``georiva render_shore_shadow``)
+    rather than shipped, so the flag the viewer reads is the conjunction of an
+    operator's choice and a fact about the disk. Reporting the choice alone
+    would have the style declare a raster source with no pyramid behind it,
+    which is a few hundred 404s on every pan.
+    """
+
+    def setUp(self):
+        dial_org(self.client)
+
+    def _rendered(self, root):
+        """A pyramid as far as anything here can tell: z0/0/0 and nothing else."""
+        tile = pyramid_in(root) / "0" / "0" / "0.png"
+        tile.parent.mkdir(parents=True, exist_ok=True)
+        tile.write_bytes(b"")
+        return root
+
+    def _flag(self):
+        return self.client.get(reverse(URL)).json()["config"]["shore_shadow"]
+
+    def _ask_for_it(self):
+        settings = ForecastViewerSettings.for_site(Site.objects.get(hostname=org_host()))
+        settings.shore_shadow = True
+        settings.save()
+
+    def test_off_by_default(self):
+        """Nothing ships the tiles, so 'not asked for' is the honest default."""
+        self.assertFalse(self._flag())
+
+    def test_asked_for_but_never_rendered_is_still_off(self):
+        with TemporaryDirectory() as root, override_settings(STATIC_ROOT=root):
+            self._ask_for_it()
+            self.assertFalse(self._flag())
+
+    def test_asked_for_and_rendered_is_on(self):
+        with TemporaryDirectory() as root, override_settings(STATIC_ROOT=self._rendered(Path(root))):
+            self._ask_for_it()
+            self.assertTrue(self._flag())
+
+    def test_rendered_but_not_asked_for_is_off(self):
+        """The pyramid being on disk is not consent: an operator still chooses."""
+        with TemporaryDirectory() as root, override_settings(STATIC_ROOT=self._rendered(Path(root))):
+            self.assertFalse(self._flag())

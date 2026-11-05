@@ -155,6 +155,11 @@ jobs:
           set -euo pipefail
           test -f "$BUNDLE/index.html" || { echo "::error::$BUNDLE/index.html is missing: the build produced nothing"; exit 1; }
 
+          # Nothing here checks for the shore shadow. A release does not carry
+          # it: the pyramid is rendered on the machine that serves it, by
+          # `georiva render_shore_shadow` (docs/shore-shadow.md), so an
+          # absence here is correct rather than a release to stop.
+
           # Detached, so the commit belongs to the tag and to nothing else; main
           # is not touched and never carries the bundle.
           git checkout --detach --quiet HEAD
@@ -232,6 +237,10 @@ jobs:
             echo "::error::index.html does not reference /static/forecast_viewer/assets/; check Vite's base"
             exit 1
           }
+          # The shore shadow is deliberately not among these files. It is
+          # rendered into STATIC_ROOT on the server that serves it, beside
+          # what collectstatic puts there, and is off until an operator turns
+          # it on (docs/shore-shadow.md).
           echo "served $(find "$collected/forecast_viewer" -type f | wc -l) files from /static/forecast_viewer/"
 
       # Last, because everything above is still reversible and this is not.

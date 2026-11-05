@@ -209,3 +209,110 @@ exits 0 with no output. Core's parser is right about which key it reads; it is
 wrong to say nothing when a manifest asks for nothing. Smaller than the two
 above, and a one-line `WARNING` on the `stderr` channel the parser already uses
 for `SKIP` and for the no-source warning would close it.
+
+## Since this walk — 2026-11-05, the basemap
+
+The external-traffic finding above was true when it was made and is left
+standing as the record of that walk. It no longer describes the viewer.
+
+The built-in default basemap style URL it names — the one string in `src/`
+besides the five GeoRiva routes, pointing at `basemaps.cartocdn.com` — is gone,
+and with it the `basemap_style_url` setting that let an organisation replace
+it. The viewer now carries one style of its own in `web/src/map/basemap.ts`,
+bundled into the app rather than fetched, so a cold load makes **no style
+request at all**. The external host is now `tiles.openfreemap.org`, for tiles
+and glyphs only; no sprite is fetched, because nothing in the style draws an
+icon. Re-run the audit's `grep` and the five GeoRiva routes now stand alone,
+with the OpenFreeMap URLs reachable only through that one module.
+
+Two things the walk's reasoning still holds for: the bundle assembles no URL of
+its own outside `addresses.ts`, and nothing the basemap touches carries a
+credential or a session assumption — the OpenFreeMap source is declared by its
+TileJSON URL, which is also where its attribution comes from.
+
+## Since this walk — 2026-11-05, a second external host, borrowed
+
+The basemap note above said the bundle reaches `tiles.openfreemap.org` and
+nothing else. That is no longer true, and the exception is deliberate but
+temporary.
+
+The shore's shadow — the soft band in the water along every coast — is served
+as pre-rendered raster tiles from
+`storage.googleapis.com/map-borders-tiles/borders_in/{z}/{x}/{y}.png`: black at
+nine alpha steps over transparency, z0–z8. MapLibre cannot draw this effect
+itself; the vector attempt pushed a blurred line off the shore with
+`line-offset`, which folds the geometry wherever the offset outruns the spacing
+between vertices, and on Lake Victoria's shoreline that is everywhere.
+
+Three things an operator or reviewer should know about that host:
+
+- **It is not ours and it is not licensed.** The bucket is anonymously
+  readable, but its metadata and listing are not, so there is no discoverable
+  licence, no terms and no identifiable owner. Every tile a user loads bills a
+  stranger's egress, with no SLA and no undertaking that it will still be there
+  tomorrow. It was last modified in March 2026.
+- **It bakes in somebody else's international boundaries.** The tiles are not
+  only a shadow: an inland tile over DRC with no coast in it is still 18,718
+  non-transparent pixels. The style therefore continues to draw its own
+  coastline and borders over the top, so that the lines GeoRiva *asserts* are
+  the ones whose filters live in this repository — maritime excluded, disputed
+  dashed, `claimed_by` dropped. `basemap.test.ts` pins those layers against
+  being deleted as redundant. What this does **not** do is stop the borrowed
+  tiles drawing boundaries of their own underneath, including ones our filters
+  exist to exclude.
+- **It is meant to be replaced**, by tiles rendered and hosted by us from
+  Natural Earth coastlines: wmo-raf/georiva-forecast-viewer#15.
+
+## Since this walk — 2026-11-05, the borrowed host is gone
+
+wmo-raf/georiva-forecast-viewer#15 is done, and the note above is now only the
+record of why. **The bundle reaches no host but GeoRiva's own and
+OpenFreeMap's**, which is the claim item 2 of the PRD's list rests on and the
+one the two notes above had each weakened in turn.
+
+The shore's shadow is now rendered offline from Natural Earth 1:10m land,
+minor islands and lakes — public domain — by `tools/build_shore_shadow.py` in
+development and `georiva render_shore_shadow` on a server, and served by nginx
+from `/static/forecast_viewer/shore-shadow/…` alongside the rest of the app.
+The tiles are rendered per machine rather than committed (55 MB of binary that
+is a pure function of code already in git). `SHADOW_TILES` in `web/src/map/basemap.ts` is
+`import.meta.env.BASE_URL` plus a tile path, so it is the same origin that
+served the page, whatever host that is. z0–z8, the extent the borrowed pyramid
+had; nothing is fetched at runtime that is not inside the plugin.
+
+Three things that changed with it, beyond the host:
+
+- **The tiles assert nothing.** They are rendered from land and lakes and no
+  boundary layer of any kind, so the only borders on this map are the ones
+  `basemap.ts`'s filters draw — maritime excluded, disputed dashed,
+  `claimed_by` dropped. The borrowed tiles' own unaudited rendering of
+  contested African borders, drawn *under* ours where no reviewer could see it,
+  is simply not there any more. For a WMO-affiliated product deployed to
+  national met services this was the point of the exercise; the egress and the
+  missing licence were the lesser halves of it.
+- **The band's width is a function of zoom**, measured off the borrowed tiles
+  rather than assumed: 4 px at the world view, 20 at z6, 25 from z7. The first
+  cut of this used one width everywhere — the 27 px read off a single z6 tile —
+  and darkened 2,200 km of ocean at z0 where the tiles it replaced darkened
+  310. What the pyramid inherits from Natural Earth instead is a band whose
+  landward edge can sit three or four pixels off the drawn coastline at z8,
+  where 1:10m geometry runs out. See `docs/shore-shadow.md`.
+- **The audit's grep no longer finds the host.** The style's addresses are now
+  checked by a test instead (`basemap.test.ts`, "reach no host but
+  OpenFreeMap"), which walks every URL the style declares and fails on any
+  absolute one that is not OpenFreeMap's. That is a stronger guard than a grep
+  somebody has to remember to re-run, and it covers the next borrowed raster
+  as well as this one.
+
+Checked against the running stack, with the bundle built and collected so the
+browser was served the tree a release ships: the viewer draws the band from the
+world view down to z8 and fades it out above, with no tile seams anywhere, and
+the network log shows the tiles arriving from the GeoRiva host under
+`/static/forecast_viewer/shore-shadow/` — every one of them a 200, and nothing
+else on any host but OpenFreeMap. 15,088 tiles, 55 MB.
+
+One thing worth recording about the pyramid this replaced, since it is the
+reason not to treat it as a reference beyond the shore: at z7 and z8 most of
+its ink is **rivers and administrative lines**, not a shore shadow. An inland
+z8 tile over northern India is a dense web of them. Ours is empty there, which
+is what a shore shadow should be.
