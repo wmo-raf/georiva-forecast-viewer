@@ -23,6 +23,9 @@
  * credit line written down here to drift out of date. No sprite is declared
  * because nothing draws an icon.
  *
+ * The one exception is `SHADOW_TILES`, which is borrowed and temporary — see
+ * the note on that constant, and wmo-raf/georiva-forecast-viewer#15.
+ *
  * Layer order is what keeps the data in the middle of the picture: the ground,
  * then an empty `georiva-data-anchor`, then the boundaries, then the labels.
  * `MapView.vue` inserts its deck layers before the anchor, so data draws above
@@ -40,47 +43,48 @@ const OPENFREEMAP = "https://tiles.openfreemap.org";
  * The greys, dead neutral (R=G=B). A cast of any kind would tint the data
  * sitting on top of it, and the point of this ground is that it does not.
  */
-/** Land, ocean and lake alike. One tone, everywhere — no body of water has a fill. */
+/** Land and ocean alike. One tone: the sea has no fill, and the shore is a line. */
 const GROUND = "#8c8c8c";
 /**
- * The larger rivers. A step lighter than `LINE`, on purpose: a coastline is a
- * hard boundary you read the map by, a river is a landscape cue, and giving
- * them the same grey would make the Nile speak as loudly as the Somali coast.
+ * Lakes, and the larger rivers. A step darker than the ground, and a step
+ * lighter than `LINE`: a coastline is a hard boundary you read the map by, a
+ * lake or a river is a landscape feature, and they should not speak at the
+ * same volume.
  */
-const RIVER = "#7a7a7a";
+const INLAND_WATER = "#7a7a7a";
 /** The shore and the borders: darker than the ground, which is what makes them read. */
 const LINE = "#6b6b6b";
 /**
- * The shore's shadow. Black rather than a named grey: it darkens whatever is
- * beneath it by a proportion, so it stays right if the ground above ever moves,
- * where a grey would be a hard-coded relationship between two constants.
- */
-const SHADOW = "#000000";
-const SHADOW_OPACITY = 0.2;
-/**
- * How wide the band is, in screen pixels. It grows with zoom because a shadow
- * of a fixed width stops reading as depth and starts reading as a stroke. The
- * low end is deliberately small: at z0–z2 a wide band on two facing shores
- * merges and closes up the narrow seas, the Red Sea first.
- */
-const SHADOW_WIDTH: Stop[] = [
-  [2, 4],
-  [5, 12],
-  [9, 24],
-];
-/**
- * How far the band is pushed off the shore and into the water, in the same
- * screen pixels — half the width, so the band's outer edge lands on the shore
- * itself rather than across it.
+ * The shore's shadow, as pre-rendered raster tiles: black at nine alpha steps
+ * over transparency, a crisp shore and a graduated band falling away from it
+ * into the water.
  *
- * `line-offset` shifts perpendicular to the direction of travel, and the vector
- * tile spec winds exterior rings clockwise and interior rings the other way, so
- * one sign puts the band inside the water polygon everywhere: seaward of a
- * coast, inside a lake, and — because a hole's winding is reversed — still in
- * the water around an island. The sign was settled by looking at the rendered
- * pixels, not by reasoning about the three conventions it depends on.
+ * It is drawn this way because MapLibre cannot do it. The vector attempt was a
+ * blurred line pushed off the shore with `line-offset`, and `line-offset`
+ * turns the geometry inside out wherever it outruns the spacing between
+ * vertices — which, on a shoreline as intricate as Lake Victoria's, is
+ * everywhere. It tore the lake into black starbursts. A raster has no geometry
+ * to fold.
+ *
+ * ---
+ *
+ * **This host is borrowed, and this is temporary.** The bucket is anonymously
+ * readable but carries no licence, no terms and no identifiable owner, and
+ * every tile a user loads bills somebody else's egress. It also bakes in that
+ * somebody's rendering of international boundaries, which is why this style
+ * still draws its own: see `boundaries` below, kept deliberately so that the
+ * borders GeoRiva asserts are the ones in this repository and not the ones in
+ * a stranger's PNG.
+ *
+ * Replacing this with tiles we render and host ourselves — Natural Earth
+ * coastlines, a Gaussian blur of the land mask multiplied by the water mask,
+ * which is one-sided by construction — is wmo-raf/georiva-forecast-viewer#15.
+ * Until then this is the only address in the bundle that is not ours or
+ * OpenFreeMap's, and `docs/done-when-check.md` records it as such.
  */
-const SHADOW_OFFSET: Stop[] = SHADOW_WIDTH.map(([zoom, width]) => [zoom, width / 2]);
+const SHADOW_TILES = "https://storage.googleapis.com/map-borders-tiles/borders_in/{z}/{x}/{y}.png";
+/** The pyramid stops at z8; past z9 an upscaled blur is worse than nothing. */
+const SHADOW_MAX_ZOOM = 8;
 
 /**
  * Labels are dark on a light ground and carry no visible halo — but they *do*
@@ -130,22 +134,33 @@ const textPaint = {
  * shadow in the water along every shore. Tunnelled water is dropped: a culvert
  * drawn as a river is just a wrong line.
  *
- * No body of water has a fill. Not the ocean, and not the lakes either — a
- * lake is the same grey as the sea and the land, and what makes it read as
- * water is the shadow inside its own shore, exactly as for a coast.
+ * The ocean has no fill — the sea is the background, and the shore is a line.
+ * Lakes do, because a flat fill is the one way of saying "water" that cannot
+ * fold, spike or stack however intricate the shoreline, and Lake Victoria's is
+ * about as intricate as they come.
  *
- * That shadow is the one piece of sleight of hand here. MapLibre has no drop
- * shadow, but a wide line with `line-blur` set to its own width degenerates
- * into a pure gradient, and `line-offset` pushes that gradient off the shore
- * and into the water. It is drawn last in this group so nothing in the ground
- * can paint over it — an earlier version put it first, behind an opaque ocean
- * fill, and rendered nothing at all.
+ * The shadow arrives as a raster (see `SHADOW_TILES`), drawn last in this
+ * group so nothing in the ground can paint over it — an earlier version put a
+ * shadow first, behind an opaque ocean fill, and rendered nothing at all.
+ *
+ * Those tiles have a shore and borders of their own baked into them. Ours are
+ * still drawn, on top and above the anchor, and that duplication is the point:
+ * the lines GeoRiva asserts have to be the ones whose filters are in this
+ * repository.
  */
 const ground: LayerSpecification[] = [
   {
     id: "ground",
     type: "background",
     paint: { "background-color": GROUND },
+  },
+  {
+    id: "lake",
+    type: "fill",
+    source: "openmaptiles",
+    "source-layer": "water",
+    filter: ["all", ["==", ["get", "class"], "lake"], ["!=", ["get", "brunnel"], "tunnel"]],
+    paint: { "fill-color": INLAND_WATER, "fill-antialias": true },
   },
   {
     id: "waterway",
@@ -156,7 +171,7 @@ const ground: LayerSpecification[] = [
     filter: ["all", ["match", ["get", "class"], ["river", "canal"], true, false], ["!=", ["get", "brunnel"], "tunnel"]],
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
-      "line-color": RIVER,
+      "line-color": INLAND_WATER,
       "line-width": byZoom([
         [5, 0.5],
         [10, 1.4],
@@ -169,20 +184,17 @@ const ground: LayerSpecification[] = [
     },
   },
   {
-    // Mirrors `coastline`'s filter exactly: the line and its shadow must never
-    // come to disagree about where the shore is.
+    // Faded out above the pyramid's last level rather than overzoomed: an
+    // upscaled shore under our own crisp one would read as a smudge.
     id: "shore-shadow",
-    type: "line",
-    source: "openmaptiles",
-    "source-layer": "water",
-    filter: ["match", ["get", "class"], ["ocean", "lake"], true, false],
-    layout: { "line-join": "round" },
+    type: "raster",
+    source: "shore-shadow",
     paint: {
-      "line-color": SHADOW,
-      "line-opacity": SHADOW_OPACITY,
-      "line-width": byZoom(SHADOW_WIDTH),
-      "line-blur": byZoom(SHADOW_WIDTH),
-      "line-offset": byZoom(SHADOW_OFFSET),
+      "raster-opacity": byZoom([
+        [SHADOW_MAX_ZOOM, 1],
+        [SHADOW_MAX_ZOOM + 2, 0],
+      ]),
+      "raster-fade-duration": 0,
     },
   },
 ];
@@ -434,6 +446,12 @@ export const GREY_BASEMAP: StyleSpecification = {
   name: "GeoRiva forecast viewer basemap",
   sources: {
     openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
+    "shore-shadow": {
+      type: "raster",
+      tiles: [SHADOW_TILES],
+      tileSize: 512,
+      maxzoom: SHADOW_MAX_ZOOM,
+    },
   },
   glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
   layers: [...ground, anchor, ...boundaries, ...placeLabels, ...marineLabels],

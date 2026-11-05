@@ -25,7 +25,7 @@ describe("the data anchor", () => {
     const anchor = indexOf(DATA_ANCHOR_ID);
     expect(anchor).toBeGreaterThan(-1);
 
-    const ground = ["ground", "waterway", "shore-shadow"];
+    const ground = ["ground", "lake", "waterway", "shore-shadow"];
     const over = ["coastline", "boundary-country", "boundary-disputed", "boundary-state"];
     const names = GREY_BASEMAP.layers.filter((layer) => layer.type === "symbol").map((layer) => layer.id);
 
@@ -57,21 +57,37 @@ describe("the shore shadow", () => {
     expect(paint["line-blur"]).toEqual(paint["line-width"]);
   });
 
-  /**
-   * Without the offset the band straddles the shore and darkens the land too.
-   * The sign cannot be checked here — only rendered pixels settle which side of
-   * the shore it lands on — but its absence can.
-   */
-  it("is pushed off the shore and into the water", () => {
-    const offset = paintOf("shore-shadow")["line-offset"] as unknown[];
-    expect(offset).toBeDefined();
-    const values = offset.slice(3).filter((_, i) => i % 2 === 1) as number[];
-    expect(values.every((v) => v > 0)).toBe(true);
+  /** It is a raster, because the vector attempt folded the geometry and tore the lakes apart. */
+  it("is a raster from its own source", () => {
+    const layer = layerOf("shore-shadow") as unknown as { type: string; source: string };
+    expect(layer.type).toBe("raster");
+    expect(GREY_BASEMAP.sources[layer.source]).toMatchObject({ type: "raster", tileSize: 512 });
   });
 
-  /** The line and its shadow must agree about where the shore is. */
-  it("follows the same water as the coastline", () => {
-    expect(layerOf("shore-shadow").filter).toEqual(layerOf("coastline").filter);
+  /**
+   * The pyramid ends at z8. Without the fade MapLibre overzooms it, and an
+   * upscaled shore smudged under our own crisp one is worse than no shadow.
+   */
+  it("fades out above the pyramid rather than overzooming", () => {
+    const source = GREY_BASEMAP.sources["shore-shadow"] as { maxzoom?: number };
+    expect(source.maxzoom).toBe(8);
+    const opacity = paintOf("shore-shadow")["raster-opacity"] as unknown[];
+    expect(opacity.at(-1)).toBe(0);
+  });
+
+  /**
+   * These tiles are borrowed, and they bake in somebody else's rendering of
+   * international boundaries. Ours stay, drawn over them, so the borders this
+   * product asserts are the ones whose filters live in this repository —
+   * maritime lines out, disputed dashed, `claimed_by` dropped. Deleting any of
+   * these layers because "the raster already draws them" is the mistake this
+   * test exists to stop.
+   */
+  it("does not let the borrowed tiles become our boundaries", () => {
+    for (const id of ["coastline", "boundary-country", "boundary-disputed", "boundary-state"]) {
+      expect(indexOf(id), `${id} must survive the raster`).toBeGreaterThan(indexOf(DATA_ANCHOR_ID));
+    }
+    expect(layerOf("boundary-disputed")).toMatchObject({ paint: { "line-dasharray": [2, 2] } });
   });
 });
 

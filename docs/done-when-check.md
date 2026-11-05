@@ -229,3 +229,36 @@ Two things the walk's reasoning still holds for: the bundle assembles no URL of
 its own outside `addresses.ts`, and nothing the basemap touches carries a
 credential or a session assumption — the OpenFreeMap source is declared by its
 TileJSON URL, which is also where its attribution comes from.
+
+## Since this walk — 2026-11-05, a second external host, borrowed
+
+The basemap note above said the bundle reaches `tiles.openfreemap.org` and
+nothing else. That is no longer true, and the exception is deliberate but
+temporary.
+
+The shore's shadow — the soft band in the water along every coast — is served
+as pre-rendered raster tiles from
+`storage.googleapis.com/map-borders-tiles/borders_in/{z}/{x}/{y}.png`: black at
+nine alpha steps over transparency, z0–z8. MapLibre cannot draw this effect
+itself; the vector attempt pushed a blurred line off the shore with
+`line-offset`, which folds the geometry wherever the offset outruns the spacing
+between vertices, and on Lake Victoria's shoreline that is everywhere.
+
+Three things an operator or reviewer should know about that host:
+
+- **It is not ours and it is not licensed.** The bucket is anonymously
+  readable, but its metadata and listing are not, so there is no discoverable
+  licence, no terms and no identifiable owner. Every tile a user loads bills a
+  stranger's egress, with no SLA and no undertaking that it will still be there
+  tomorrow. It was last modified in March 2026.
+- **It bakes in somebody else's international boundaries.** The tiles are not
+  only a shadow: an inland tile over DRC with no coast in it is still 18,718
+  non-transparent pixels. The style therefore continues to draw its own
+  coastline and borders over the top, so that the lines GeoRiva *asserts* are
+  the ones whose filters live in this repository — maritime excluded, disputed
+  dashed, `claimed_by` dropped. `basemap.test.ts` pins those layers against
+  being deleted as redundant. What this does **not** do is stop the borrowed
+  tiles drawing boundaries of their own underneath, including ones our filters
+  exist to exclude.
+- **It is meant to be replaced**, by tiles rendered and hosted by us from
+  Natural Earth coastlines: wmo-raf/georiva-forecast-viewer#15.
