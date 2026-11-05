@@ -138,14 +138,30 @@ const SHADOW_MAX_ZOOM = 8;
 const SHADOW_OPACITY = 0.6;
 
 /**
- * Labels are dark on a light ground and carry no visible halo — but they *do*
- * carry a white one at low alpha. On the grey it cannot be seen; it asserts
- * itself only where a name crosses the dark end of a palette, which is the one
- * place dark text on its own would disappear.
+ * White names in a hard black outline, everywhere: countries, cities, oceans
+ * and seas alike, from the one `textPaint` below.
+ *
+ * A single text colour has to survive both ends of every palette and the grey
+ * between them, and only an outlined one does. Dark grey with a faint white
+ * halo — which is what this was — is tuned to the ground, and the ground is
+ * the thing a global field paints over: IFS leaves no grey anywhere, so the
+ * names spend their whole life over colour. White on black is the pair that
+ * does not care which colour.
+ *
+ * So the halo carries the label and the fill is the constant, which is the
+ * reverse of what it used to be. It is opaque, because a see-through outline
+ * muddies against a mid-tone and fails exactly where it is needed, and 1.2 px,
+ * which closes cleanly around text from 10 to 19 px — MapLibre builds halos
+ * from the glyph SDF and they stop growing well past about a quarter of the
+ * font size.
+ *
+ * The black ring is also what keeps a name off the wind: the particles are
+ * white too (`WIND.color` in `MapView.vue`), and without an outline a trail
+ * running through a label would read as part of the letters.
  */
-const TEXT = "#3a3a3a";
-const HALO = "rgba(255,255,255,0.3)";
-const HALO_WIDTH = 0.6;
+const TEXT = "#ffffff";
+const HALO = "#000000";
+const HALO_WIDTH = 1.2;
 
 const REGULAR = ["Noto Sans Regular"];
 const ITALIC = ["Noto Sans Italic"];
@@ -366,7 +382,8 @@ const boundaries: LayerSpecification[] = [
 ];
 
 /**
- * Countries carry the map: uppercase, letter-spaced, regular weight, quiet.
+ * Countries carry the map: uppercase, letter-spaced, regular weight. Quiet is
+ * now the business of the letterforms rather than the colour — see `TEXT`.
  * Cities stay out of the continental view entirely and arrive at z5, where a
  * user has zoomed to a country and wants to find a place in it.
  */
