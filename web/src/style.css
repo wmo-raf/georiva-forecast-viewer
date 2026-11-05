@@ -608,4 +608,17 @@ button {
   .legend {
     order: -1;
   }
+  /* The legend is now directly above the days, where the handle used to
+     stand, so the handle hangs below them instead — the bar keeps 96px of
+     clearance under it, which is more than it needs. */
+  .strip__label {
+    top: calc(100% + 10px);
+    bottom: auto;
+  }
+  .strip__label::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: #000;
+  }
 }
