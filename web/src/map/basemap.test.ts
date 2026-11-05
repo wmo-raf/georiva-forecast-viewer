@@ -51,12 +51,6 @@ describe("the shore shadow", () => {
     expect(indexOf("shore-shadow")).toBe(anchor - 1);
   });
 
-  /** A shadow you can see the edge of is a stroke; the blur is what makes it one. */
-  it("blurs by as much as it is wide", () => {
-    const paint = paintOf("shore-shadow");
-    expect(paint["line-blur"]).toEqual(paint["line-width"]);
-  });
-
   /** It is a raster, because the vector attempt folded the geometry and tore the lakes apart. */
   it("is a raster from its own source", () => {
     const layer = layerOf("shore-shadow") as unknown as { type: string; source: string };
@@ -65,8 +59,27 @@ describe("the shore shadow", () => {
   });
 
   /**
-   * The pyramid ends at z8. Without the fade MapLibre overzooms it, and an
-   * upscaled shore smudged under our own crisp one is worse than no shadow.
+   * The tiles are rendered by `tools/build_shore_shadow.py` and committed under
+   * `web/public/shore-shadow/`, so they are served from the bundle's own base
+   * path — and that is the whole of issue #15. A third-party absolute URL here
+   * is how the map came to depend on an unlicensed bucket that also drew
+   * somebody else's African borders under ours; the only hosts this bundle may
+   * reach are its own origin and OpenFreeMap.
+   */
+  it("comes from our own host, by this bundle's base path", () => {
+    const source = GREY_BASEMAP.sources["shore-shadow"] as { tiles?: string[] };
+    const [url] = source.tiles ?? [];
+    expect(url).toBe(`${import.meta.env.BASE_URL}shore-shadow/{z}/{x}/{y}.png`);
+    expect(url).not.toMatch(/^https?:\/\//);
+    expect(url).toContain("{z}/{x}/{y}");
+  });
+
+  /**
+   * The pyramid ends at z8, as the borrowed one did. Without the fade MapLibre
+   * overzooms it, and an upscaled band drifting off our own crisp coastline is
+   * worse than none. `MAX_ZOOM` in `shore_shadow.py` is the other half of this
+   * number: a style that claims a level the pyramid does not have asks every
+   * client for tiles that are not there.
    */
   it("fades out above the pyramid rather than overzooming", () => {
     const source = GREY_BASEMAP.sources["shore-shadow"] as { maxzoom?: number };
@@ -76,14 +89,15 @@ describe("the shore shadow", () => {
   });
 
   /**
-   * These tiles are borrowed, and they bake in somebody else's rendering of
-   * international boundaries. Ours stay, drawn over them, so the borders this
-   * product asserts are the ones whose filters live in this repository —
-   * maritime lines out, disputed dashed, `claimed_by` dropped. Deleting any of
-   * these layers because "the raster already draws them" is the mistake this
-   * test exists to stop.
+   * The shadow shades water; the boundaries say where a border is. Only the
+   * second is a claim, and this product's claims are the ones whose filters
+   * live in this repository — maritime lines out, disputed dashed, `claimed_by`
+   * dropped. Deleting any of these layers because "the raster already shows
+   * the coast" is the mistake this test exists to stop, and it is how the
+   * borrowed tiles it replaced came to draw unaudited African borders under
+   * ours for a while.
    */
-  it("does not let the borrowed tiles become our boundaries", () => {
+  it("does not let a raster become our boundaries", () => {
     for (const id of ["coastline", "boundary-country", "boundary-disputed", "boundary-state"]) {
       expect(indexOf(id), `${id} must survive the raster`).toBeGreaterThan(indexOf(DATA_ANCHOR_ID));
     }
@@ -112,6 +126,31 @@ describe("asset references", () => {
       expect(layer.layout?.["icon-image"], `${layer.id} wants an icon but the style has no sprite`).toBeUndefined();
     }
     expect(GREY_BASEMAP.sprite).toBeUndefined();
+  });
+
+  /**
+   * Every address in the style, in one place. The viewer's deployment promise
+   * (`docs/done-when-check.md`) is that it reaches GeoRiva and OpenFreeMap and
+   * nothing else, and this module is the only one in the bundle that names a
+   * host at all. A new absolute URL here — a hillshade, a sprite, a borrowed
+   * raster — is the one change that can break that promise without touching a
+   * single GeoRiva route.
+   */
+  it("reach no host but OpenFreeMap", () => {
+    const urls = [
+      GREY_BASEMAP.glyphs,
+      GREY_BASEMAP.sprite,
+      ...Object.values(GREY_BASEMAP.sources).flatMap((source) => {
+        const declared = source as { url?: string; tiles?: string[] };
+        return [declared.url, ...(declared.tiles ?? [])];
+      }),
+    ].filter((url): url is string => typeof url === "string");
+
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      if (!/^https?:\/\//.test(url)) continue;
+      expect(new URL(url).host, `${url} is not a host this viewer may reach`).toBe("tiles.openfreemap.org");
+    }
   });
 
   /** A font the glyph server has not got is a label that never appears. */

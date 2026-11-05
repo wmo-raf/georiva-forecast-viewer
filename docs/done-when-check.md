@@ -262,3 +262,57 @@ Three things an operator or reviewer should know about that host:
   exist to exclude.
 - **It is meant to be replaced**, by tiles rendered and hosted by us from
   Natural Earth coastlines: wmo-raf/georiva-forecast-viewer#15.
+
+## Since this walk — 2026-11-05, the borrowed host is gone
+
+wmo-raf/georiva-forecast-viewer#15 is done, and the note above is now only the
+record of why. **The bundle reaches no host but GeoRiva's own and
+OpenFreeMap's**, which is the claim item 2 of the PRD's list rests on and the
+one the two notes above had each weakened in turn.
+
+The shore's shadow is now rendered offline from Natural Earth 1:10m land,
+minor islands and lakes — public domain — by `tools/build_shore_shadow.py` in
+development and `georiva render_shore_shadow` on a server, and served by nginx
+from `/static/forecast_viewer/shore-shadow/…` alongside the rest of the app.
+The tiles are rendered per machine rather than committed (55 MB of binary that
+is a pure function of code already in git). `SHADOW_TILES` in `web/src/map/basemap.ts` is
+`import.meta.env.BASE_URL` plus a tile path, so it is the same origin that
+served the page, whatever host that is. z0–z8, the extent the borrowed pyramid
+had; nothing is fetched at runtime that is not inside the plugin.
+
+Three things that changed with it, beyond the host:
+
+- **The tiles assert nothing.** They are rendered from land and lakes and no
+  boundary layer of any kind, so the only borders on this map are the ones
+  `basemap.ts`'s filters draw — maritime excluded, disputed dashed,
+  `claimed_by` dropped. The borrowed tiles' own unaudited rendering of
+  contested African borders, drawn *under* ours where no reviewer could see it,
+  is simply not there any more. For a WMO-affiliated product deployed to
+  national met services this was the point of the exercise; the egress and the
+  missing licence were the lesser halves of it.
+- **The band's width is a function of zoom**, measured off the borrowed tiles
+  rather than assumed: 4 px at the world view, 20 at z6, 25 from z7. The first
+  cut of this used one width everywhere — the 27 px read off a single z6 tile —
+  and darkened 2,200 km of ocean at z0 where the tiles it replaced darkened
+  310. What the pyramid inherits from Natural Earth instead is a band whose
+  landward edge can sit three or four pixels off the drawn coastline at z8,
+  where 1:10m geometry runs out. See `docs/shore-shadow.md`.
+- **The audit's grep no longer finds the host.** The style's addresses are now
+  checked by a test instead (`basemap.test.ts`, "reach no host but
+  OpenFreeMap"), which walks every URL the style declares and fails on any
+  absolute one that is not OpenFreeMap's. That is a stronger guard than a grep
+  somebody has to remember to re-run, and it covers the next borrowed raster
+  as well as this one.
+
+Checked against the running stack, with the bundle built and collected so the
+browser was served the tree a release ships: the viewer draws the band from the
+world view down to z8 and fades it out above, with no tile seams anywhere, and
+the network log shows the tiles arriving from the GeoRiva host under
+`/static/forecast_viewer/shore-shadow/` — every one of them a 200, and nothing
+else on any host but OpenFreeMap. 15,088 tiles, 55 MB.
+
+One thing worth recording about the pyramid this replaced, since it is the
+reason not to treat it as a reference beyond the shore: at z7 and z8 most of
+its ink is **rivers and administrative lines**, not a shore shadow. An inland
+z8 tile over northern India is a dense web of them. Ours is empty there, which
+is what a shore shadow should be.

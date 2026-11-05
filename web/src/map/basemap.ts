@@ -23,8 +23,10 @@
  * credit line written down here to drift out of date. No sprite is declared
  * because nothing draws an icon.
  *
- * The one exception is `SHADOW_TILES`, which is borrowed and temporary — see
- * the note on that constant, and wmo-raf/georiva-forecast-viewer#15.
+ * The shore's shadow is ours too, all the way down: `SHADOW_TILES` are rendered
+ * from Natural Earth by `tools/build_shore_shadow.py`, committed under
+ * `web/public/shore-shadow/` and served from this bundle's own static path. No
+ * address in this style belongs to anybody but us and OpenFreeMap.
  *
  * Layer order is what keeps the data in the middle of the picture: the ground,
  * then an empty `georiva-data-anchor`, then the boundaries, then the labels.
@@ -66,24 +68,46 @@ const LINE = "#6b6b6b";
  * everywhere. It tore the lake into black starbursts. A raster has no geometry
  * to fold.
  *
- * ---
+ * These tiles are our own. They are rendered offline from Natural Earth's
+ * 1:10m land and lakes — public domain — by `tools/build_shore_shadow.py`,
+ * which reads a ramp off each water pixel's distance to land and multiplies it
+ * by the water mask, so the band is one-sided by construction, exactly zero on
+ * land, and never saturates on a narrow lake. How far it reaches is a function
+ * of zoom, measured off the pyramid this replaced: a 4-pixel hairline at the
+ * world view, 20 px at z6, 25 from z7. A single width at every zoom — which
+ * this had at first — darkens 2,200 km of ocean at z0 and smothers the map.
+ * They are committed
+ * under `web/public/shore-shadow/` and copied into the bundle by the build, so
+ * the address below is this bundle's own base path: the tiles arrive from
+ * whatever host served the app, over the same connection, with no third party
+ * in the picture.
  *
- * **This host is borrowed, and this is temporary.** The bucket is anonymously
- * readable but carries no licence, no terms and no identifiable owner, and
- * every tile a user loads bills somebody else's egress. It also bakes in that
- * somebody's rendering of international boundaries, which is why this style
- * still draws its own: see `boundaries` below, kept deliberately so that the
- * borders GeoRiva asserts are the ones in this repository and not the ones in
- * a stranger's PNG.
+ * Two things that followed from rendering them ourselves rather than borrowing
+ * a stranger's pyramid, which is what this replaced
+ * (wmo-raf/georiva-forecast-viewer#15):
  *
- * Replacing this with tiles we render and host ourselves — Natural Earth
- * coastlines, a Gaussian blur of the land mask multiplied by the water mask,
- * which is one-sided by construction — is wmo-raf/georiva-forecast-viewer#15.
- * Until then this is the only address in the bundle that is not ours or
- * OpenFreeMap's, and `docs/done-when-check.md` records it as such.
+ * - **They contain a shadow and nothing else.** The borrowed tiles carried
+ *   somebody's unaudited rendering of international boundaries underneath
+ *   ours — an inland tile over DRC with no coast in it was still 18,718
+ *   non-transparent pixels. Ours draw only the water beside a shore, so the
+ *   only boundaries on this map are the ones whose filters live in this
+ *   repository.
+ * - **Nothing bills a stranger's egress**, and there is no host outside this
+ *   deployment that can take the map's legibility away by deleting a bucket.
  */
-const SHADOW_TILES = "https://storage.googleapis.com/map-borders-tiles/borders_in/{z}/{x}/{y}.png";
-/** The pyramid stops at z8; past z9 an upscaled blur is worse than nothing. */
+const SHADOW_TILES = `${import.meta.env.BASE_URL}shore-shadow/{z}/{x}/{y}.png`;
+/**
+ * The pyramid stops at z8, as the borrowed one did, and the layer fades out
+ * above it rather than letting MapLibre overzoom an upscaled blur.
+ *
+ * z8 is where Natural Earth 1:10m starts to cost something: it is accurate to
+ * a few hundred metres, about a pixel at z6 and three or four by z8, so at the
+ * bottom of the pyramid the band's hard landward edge can sit a few pixels off
+ * the coastline drawn over it from OpenMapTiles. That is the price of the
+ * shadow surviving to the zoom a forecast is actually read at; past z8 it is
+ * no longer worth paying. `MAX_ZOOM` in `shore_shadow.py` is the other half of
+ * this number.
+ */
 const SHADOW_MAX_ZOOM = 8;
 
 /**
@@ -143,10 +167,10 @@ const textPaint = {
  * group so nothing in the ground can paint over it — an earlier version put a
  * shadow first, behind an opaque ocean fill, and rendered nothing at all.
  *
- * Those tiles have a shore and borders of their own baked into them. Ours are
- * still drawn, on top and above the anchor, and that duplication is the point:
- * the lines GeoRiva asserts have to be the ones whose filters are in this
- * repository.
+ * It is a shadow and only a shadow: no line, no border, nothing asserted. The
+ * coastline over it is still drawn from OpenMapTiles above the anchor, because
+ * the shadow says "this is water" and the coastline says "this is where the
+ * boundary is", and only the second of those is a claim.
  */
 const ground: LayerSpecification[] = [
   {
@@ -215,6 +239,11 @@ const anchor: LayerSpecification = {
  * Maritime border lines stay out; disputed ones are dashed and `claimed_by`
  * variants are dropped. That treatment is a WMO product's obligation and is not
  * up for restyling.
+ *
+ * These are the lines the product *asserts*, which is what separates them from
+ * the shadow below the anchor: the shadow shades water, these say where a
+ * boundary is. It is why the shadow is rendered from land and lakes only, and
+ * why no raster on this map is allowed to carry a border of its own.
  */
 const NOT_MARITIME: ExpressionSpecification = ["!=", ["get", "maritime"], 1];
 const UNDISPUTED: ExpressionSpecification = ["!=", ["get", "disputed"], 1];
