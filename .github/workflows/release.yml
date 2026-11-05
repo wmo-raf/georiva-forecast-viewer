@@ -68,10 +68,21 @@ jobs:
       # turned the Django job red after the merge, would otherwise be released
       # without anyone noticing. So the grounds are checked rather than assumed.
       #
-      # The query is narrow on purpose: completed runs of ci.yml for this exact
-      # SHA. A commit with no completed CI run is refused too — "no answer" is
-      # not "green". It deliberately does not look at check runs in general,
-      # which would include this release run itself.
+      # The query is narrow on purpose: runs of ci.yml for this exact SHA, and
+      # of those, the first that has finished. A commit with no completed CI
+      # run is refused too — "no answer" is not "green". It deliberately does
+      # not look at check runs in general, which would include this release
+      # run itself.
+      #
+      # `status=completed` is *not* a query parameter here, though it reads
+      # like the obvious way to say that. The API answers `head_sha` and
+      # `status` correctly on their own and returns nothing at all when both
+      # are given: for the commit this was first run against, `?head_sha=X`
+      # gave one completed successful run, `?status=completed` gave eight, and
+      # the two together gave zero. So the filter that mattered silently
+      # excluded everything, and the guard refused a green commit — a failure
+      # that reads exactly like CI being red, and that no release could ever
+      # have passed. Narrow by SHA in the query; pick the finished run in jq.
       - name: Check CI is green for the commit being released
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,8 +90,8 @@ jobs:
           set -euo pipefail
           sha=$(git rev-parse HEAD)
           conclusion=$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha&status=completed" \
-            --jq '.workflow_runs[0].conclusion // "none"')
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha" \
+            --jq '[.workflow_runs[] | select(.status == "completed") | .conclusion][0] // "none"')
           if [ "$conclusion" != "success" ]; then
             echo "::error::CI for $sha is '$conclusion', not success; releasing it would ship untested code"
             exit 1
