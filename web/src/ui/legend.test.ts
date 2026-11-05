@@ -130,7 +130,16 @@ describe("the blocks a classification draws", () => {
     expect(legendBar(RAIN, -100, 100)).toEqual(legendBar(RAIN));
   });
 
-  it("draws every class but labels at most ten, always including the first", () => {
+  it("labels every block of a palette the pill has room to label", () => {
+    const bands = Array.from(
+      { length: 12 },
+      (_, i): [number, number, [number, number, number]] => [i, i + 1, [i * 20, i * 20, i * 20]],
+    );
+    const drawn = stepped(classes(bands)).classes;
+    expect(drawn.every((band) => band.label !== null)).toBe(true);
+  });
+
+  it("draws every class but labels at most twelve, always including the first", () => {
     const bands = Array.from(
       { length: 25 },
       (_, i): [number, number, [number, number, number]] => [i, i + 1, [i, i, i]],
@@ -139,7 +148,7 @@ describe("the blocks a classification draws", () => {
     const drawn = stepped(many).classes;
     expect(drawn).toHaveLength(25);
     const labelled = drawn.filter((band) => band.label !== null);
-    expect(labelled.length).toBeLessThanOrEqual(10);
+    expect(labelled.length).toBeLessThanOrEqual(12);
     expect(drawn[0].label).toBe("0");
     // Dropped only the label: the colour and its range are still there.
     expect(drawn[1].label).toBeNull();

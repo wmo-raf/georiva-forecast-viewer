@@ -290,8 +290,13 @@ button {
   display: flex;
   align-items: stretch;
   height: 22px;
-  width: max-content;
+  /* Fixed, so the pill's edge never moves with the palette or the variable;
+     everything inside divides what is there. It gives way only to a viewport
+     too narrow to hold it, where `100%` is the footer's own width. */
+  width: 360px;
   max-width: 100%;
+  /* So the border is inside the fixed width, and inside the fallback too. */
+  box-sizing: border-box;
   background: var(--fv-panel-solid);
   border: 1px solid var(--fv-border);
   border-radius: 999px;
@@ -320,34 +325,31 @@ button {
 
 /* Equal blocks: a classification is not an axis, so a narrow class is as wide
    as a broad one and always has room for the value that names it. */
-/* The width is set rather than left to `flex-basis`: the pill is sized by its
-   contents (`width: max-content`), and a flex item contributes its width to
-   that, never its basis — a block sized only by basis would measure as nothing
-   and collapse the pill. It still shrinks when the pill meets its maximum. */
+/* Equal blocks: a classification is not an axis, so a narrow class is as wide
+   as a broad one. They divide the ramp between them, whatever it measures. */
 .legend__class {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
-  width: 38px;
+  flex: 1 1 0;
   min-width: 0;
-  padding-left: 4px;
   overflow: hidden;
 }
 
-/* The first block is cut into by the pill's rounding; its value clears it. */
-.legend__class:first-child {
-  padding-left: 10px;
-}
-
+/* The inset is on the value rather than on the block, so that it cannot make
+   one block wider than another: a flex item's padding is added outside the
+   share it is given, and the first block insets further than the rest. */
 .legend__value {
+  margin-left: 4px;
   white-space: nowrap;
 }
 
-/* A ramp has no blocks to measure — its labels are absolutely positioned on it
-   — so it carries the width the pill is sized from. */
+/* The first block is cut into by the pill's rounding; its value clears it. */
+.legend__class:first-child .legend__value {
+  margin-left: 10px;
+}
+
 .legend__ramp--smooth {
   flex: 1 1 auto;
-  width: 240px;
 }
 
 /* On a ramp each value sits on the colour it names, the ends staying inside. */
@@ -373,7 +375,7 @@ button {
 /* ---- bottom strip ---- */
 
 /* The legend rides above the strip rather than beside it, so neither has to
-   reserve width for the other — the legend's own width follows its palette. */
+   reserve width for the other. */
 .bottom {
   position: absolute;
   left: 16px;

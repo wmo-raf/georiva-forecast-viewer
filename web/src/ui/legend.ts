@@ -27,8 +27,13 @@ type Rgba = [number, number, number, number];
 /** About this many labels along a continuous bar, taken from the stops. */
 const TICKS = 6;
 
-/** At most this many values printed on a stepped bar; the rest are a title. */
-const MAX_LABELS = 10;
+/**
+ * At most this many values printed on a stepped bar; the rest are a title.
+ * What the pill affords: it is a fixed 360px, so the ramp inside it is a little
+ * over 300px, and a value at 11px wants about 26px of block to sit in without
+ * touching its neighbour.
+ */
+const MAX_LABELS = 12;
 
 /** `--fv-panel-solid`: what the pill is painted on, so alpha has a floor. */
 const BACKDROP: Rgb = [18, 26, 40];
