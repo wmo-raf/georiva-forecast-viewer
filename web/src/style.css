@@ -16,7 +16,11 @@
      two rows on a narrow viewport. */
   --fv-bar-h: 32px;
   --fv-bar-total: var(--fv-bar-h);
-  --fv-bar-bottom: 16px;
+  /* MapLibre's compact credit in the bottom-right corner: the 24px ⓘ and the
+     10px margin it keeps around itself. Its expanded form is wider but no
+     taller, so standing above this band clears the credit either way. */
+  --fv-attrib-h: 34px;
+  --fv-bar-bottom: calc(var(--fv-attrib-h) + 10px);
   font-family:
     system-ui,
     -apple-system,
@@ -582,10 +586,10 @@ button {
 
 @media (max-width: 720px) {
   :root {
-    /* Two rows — the legend above the time control, as it was — and clear of
-       the map's own controls along the bottom. */
+    /* Two rows: the legend above the time control, as it was. */
     --fv-bar-total: calc(var(--fv-bar-h) + 22px + 8px);
-    --fv-bar-bottom: 96px;
+    /* The credit, and then the handle, which hangs below the days here. */
+    --fv-bar-bottom: calc(var(--fv-attrib-h) + 10px + 34px);
   }
   .rail {
     max-height: 40vh;
