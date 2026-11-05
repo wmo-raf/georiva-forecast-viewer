@@ -35,7 +35,11 @@
  * the names. `basemap.test.ts` holds that order, and the references below, to
  * the invariants they are.
  *
- * The shadow sits *above* the anchor because the ground it belongs to is not
+ * The shadow is also the one optional part: `greyBasemap({ shoreShadow })`
+ * leaves it and its source out entirely when an organisation has not switched
+ * it on, because its tiles are rendered on the server rather than shipped.
+ *
+ * It sits *above* the anchor because the ground it belongs to is not
  * always visible. A global field — IFS covers the whole world — paints over
  * every pixel of the ground, and with land and sea the same grey, a shadow
  * underneath it would be a land/sea cue that exists only while the data is
@@ -649,18 +653,45 @@ const waterLabels: LayerSpecification[] = (
   }),
 );
 
-export const GREY_BASEMAP: StyleSpecification = {
-  version: 8,
-  name: "GeoRiva forecast viewer basemap",
-  sources: {
-    openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
-    "shore-shadow": {
-      type: "raster",
-      tiles: [SHADOW_TILES],
-      tileSize: 512,
-      maxzoom: SHADOW_MAX_ZOOM,
+/**
+ * The style, with or without the shadow.
+ *
+ * A function rather than a constant because the shadow is the one part of
+ * this map that may genuinely be absent: its tiles are rendered on the server
+ * that serves them, not shipped with the bundle, and an organisation switches
+ * it on once that has been done (`docs/shore-shadow.md`). The catalogue tells
+ * us both facts as one `shore_shadow` flag.
+ *
+ * When it is off, the layer *and its source* are left out rather than hidden.
+ * A hidden layer still has a source, and a source with no pyramid behind it is
+ * several hundred 404s on every pan — so "off" has to mean the style does not
+ * know the tiles exist.
+ */
+export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } = {}): StyleSpecification {
+  return {
+    version: 8,
+    name: "GeoRiva forecast viewer basemap",
+    sources: {
+      openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
+      ...(shoreShadow
+        ? {
+            "shore-shadow": {
+              type: "raster" as const,
+              tiles: [SHADOW_TILES],
+              tileSize: 512,
+              maxzoom: SHADOW_MAX_ZOOM,
+            },
+          }
+        : {}),
     },
-  },
-  glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
-  layers: [...ground, anchor, ...shadow, ...boundaries, ...placeLabels, ...waterLabels],
-};
+    glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
+    layers: [
+      ...ground,
+      anchor,
+      ...(shoreShadow ? shadow : []),
+      ...boundaries,
+      ...placeLabels,
+      ...waterLabels,
+    ],
+  };
+}

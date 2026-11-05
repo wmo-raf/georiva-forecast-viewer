@@ -12,6 +12,7 @@ source is absent with it, so the viewer never offers a choice that leads
 nowhere.
 """
 
+from django.conf import settings as django_settings
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +23,7 @@ from georiva.organisations.access import require_active_org
 from georiva.organisations.ownership import scope_rows
 
 from .models import ForecastViewerSettings, QuantityBinding
+from .pyramid import is_rendered, pyramid_in
 
 
 def describe_config(organisation):
@@ -33,7 +35,27 @@ def describe_config(organisation):
             "center": [settings.default_longitude, settings.default_latitude],
             "zoom": settings.default_zoom,
         },
+        "shore_shadow": shore_shadow_available(settings),
     }
+
+
+def shore_shadow_available(settings):
+    """Whether the viewer should draw the shadow: asked for, and actually there.
+
+    The tiles are rendered on the server rather than shipped
+    (``georiva render_shore_shadow``), so "the operator ticked the box" and
+    "the pyramid exists" are two different facts and the viewer needs both.
+    Reporting the first alone would have the style request several hundred
+    tiles that 404.
+
+    The check is one ``stat``, on a request that already runs several queries,
+    and it is not cached: a pyramid rendered a minute ago should show up on
+    the next reload rather than after a restart or a TTL — which is precisely
+    the moment someone is reloading to find out whether the render worked.
+    """
+    if not settings.shore_shadow:
+        return False
+    return is_rendered(pyramid_in(django_settings.STATIC_ROOT)) if django_settings.STATIC_ROOT else False
 
 
 def visible_bindings(request):

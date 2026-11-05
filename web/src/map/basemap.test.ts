@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DATA_ANCHOR_ID, GREY_BASEMAP } from "./basemap";
+import { DATA_ANCHOR_ID, greyBasemap } from "./basemap";
+
+/**
+ * The style with the shadow in it, which is what most of these are about: the
+ * shadow's ordering and its source only exist in that shape. `without` is the
+ * other one — an organisation that has not had the pyramid rendered — and it
+ * has a describe of its own at the bottom.
+ */
+const GREY_BASEMAP = greyBasemap({ shoreShadow: true });
+const without = greyBasemap();
 
 /**
  * Two invariants, and deliberately not a third. Nothing here asserts a colour
@@ -183,6 +192,42 @@ describe("asset references", () => {
       for (const font of (layer.layout?.["text-font"] as string[] | undefined) ?? []) {
         expect(available, `${layer.id} asks for a font that is not served`).toContain(font);
       }
+    }
+  });
+});
+
+/**
+ * The shadow switched off, which is what a server that has not rendered the
+ * pyramid serves — and the default, since the tiles ship with nobody.
+ */
+describe("without the shore shadow", () => {
+  /**
+   * Not hidden: *absent*, source and all. A layer with `visibility: none`
+   * still carries its source, and MapLibre loads a raster source's tiles for
+   * the viewport regardless — which against a pyramid that was never rendered
+   * is a few hundred 404s on every pan. Switching the shadow off has to mean
+   * the style does not know the tiles exist.
+   */
+  it("declares neither the layer nor its source", () => {
+    expect(without.layers.map((layer) => layer.id)).not.toContain("shore-shadow");
+    expect(without.sources["shore-shadow"]).toBeUndefined();
+  });
+
+  /** Everything else is the same map: the anchor still divides it in two. */
+  it("keeps the anchor between the ground and what is read over it", () => {
+    const ids = without.layers.map((layer) => layer.id);
+    const anchor = ids.indexOf(DATA_ANCHOR_ID);
+    expect(anchor).toBeGreaterThan(-1);
+    for (const id of ["ground", "lake", "waterway"]) expect(ids.indexOf(id)).toBeLessThan(anchor);
+    for (const id of ["coastline", "boundary-country"]) expect(ids.indexOf(id)).toBeGreaterThan(anchor);
+  });
+
+  /** The same trap as the sprite: a layer naming a source MapLibre drops in silence. */
+  it("leaves no layer naming a source it no longer declares", () => {
+    const declared = Object.keys(without.sources);
+    for (const layer of without.layers) {
+      if (!("source" in layer) || layer.source === undefined) continue;
+      expect(declared, `${layer.id} names an undeclared source`).toContain(layer.source);
     }
   });
 });

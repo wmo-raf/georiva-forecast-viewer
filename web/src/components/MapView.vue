@@ -35,7 +35,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { ViewerConfig } from "../api/types";
-import { DATA_ANCHOR_ID, GREY_BASEMAP } from "../map/basemap";
+import { DATA_ANCHOR_ID, greyBasemap } from "../map/basemap";
 import { particleCount, type Bounds } from "../map/particles";
 import { loadTexture, type Texture } from "../map/texture";
 import { useViewer } from "../state/store";
@@ -194,7 +194,9 @@ onMounted(() => {
   if (!container.value) return;
   map = new maplibregl.Map({
     container: container.value,
-    style: GREY_BASEMAP,
+    // The shadow is in the style only if this organisation switched it on and
+    // the server it came from has the tiles; the catalogue answers both as one.
+    style: greyBasemap({ shoreShadow: props.config.shore_shadow }),
     center: props.config.default_view.center,
     zoom: props.config.default_view.zoom,
     attributionControl: { compact: true },

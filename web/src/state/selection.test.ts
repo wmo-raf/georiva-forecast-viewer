@@ -6,7 +6,7 @@ const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ec
 const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2", descriptor: "" };
 
 const catalogue: Catalogue = {
-  config: { org: "kmd", org_name: "KMD", default_view: { center: [20, 0], zoom: 3 } },
+  config: { org: "kmd", org_name: "KMD", default_view: { center: [20, 0], zoom: 3 }, shore_shadow: false },
   quantities: [
     {
       slug: "t2m",
