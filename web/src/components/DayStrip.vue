@@ -14,7 +14,7 @@
  * than skipping it, and the wind never lags the colours. Textures load lazily
  * per step.
  */
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-vue-next";
+import { Pause, Play } from "lucide-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   cellOf,
@@ -172,23 +172,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="strip" v-if="cells.length">
-    <div class="strip__controls">
-      <button type="button" class="strip__button" aria-label="Previous step" @click="viewer.step(-1)">
-        <ChevronLeft :size="16" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="strip__button strip__button--play"
-        :aria-label="viewer.state.playing ? 'Pause' : 'Play'"
-        @click="viewer.setPlaying(!viewer.state.playing)"
-      >
-        <Pause v-if="viewer.state.playing" :size="16" aria-hidden="true" />
-        <Play v-else :size="16" aria-hidden="true" />
-      </button>
-      <button type="button" class="strip__button" aria-label="Next step" @click="viewer.step(+1)">
-        <ChevronRight :size="16" aria-hidden="true" />
-      </button>
-    </div>
+    <button
+      type="button"
+      class="strip__play"
+      :aria-label="viewer.state.playing ? 'Pause' : 'Play'"
+      @click="viewer.setPlaying(!viewer.state.playing)"
+    >
+      <Pause v-if="viewer.state.playing" :size="16" aria-hidden="true" />
+      <Play v-else :size="16" aria-hidden="true" />
+    </button>
     <div class="strip__days" ref="daysEl" @pointerdown="grabDays">
       <!-- The handle: pointer only. The chevrons and the day cells below are
            the keyboard's way through the run, so this claims no role it does

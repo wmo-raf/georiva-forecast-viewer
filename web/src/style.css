@@ -438,54 +438,41 @@ button {
   color: var(--fv-muted);
 }
 
-/* Both pills: the same chrome, and no padding of their own, so what is inside
-   reaches the edge and the rounding clips it — the legend's treatment. */
-.strip__controls,
-.strip__days {
+/* The one control, floating to the left of the days as a circle of the bar's
+   own height. It is filled rather than panelled: it is the only thing to
+   press, so it does not need a panel's border to be found, and a solid fill
+   has nothing to blur behind it. */
+.strip__play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--fv-bar-h);
   height: var(--fv-bar-h);
   box-sizing: border-box;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--fv-shadow);
+  background: var(--fv-fg);
+  color: var(--fv-accent-fg);
+  cursor: pointer;
+}
+
+/* No padding of its own, so the cells reach its edge and the rounding clips
+   them — the legend's treatment. Not that it may clip: the tooltip stands
+   above the panel and is a child of it, so the end cells round themselves
+   instead. */
+.strip__days {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--fv-bar-h);
+  box-sizing: border-box;
+  display: flex;
   background: var(--fv-panel);
   border: 1px solid var(--fv-border);
   border-radius: var(--fv-radius);
   box-shadow: var(--fv-shadow);
   backdrop-filter: blur(10px);
-}
-
-.strip__controls {
-  display: flex;
-  flex: 0 0 auto;
-  /* Nothing inside has to escape it, so the rounding can clip the buttons. */
-  overflow: hidden;
-}
-
-.strip__button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  border: 0;
-  /* A hairline between the buttons instead of a frame around each. */
-  border-right: 1px solid var(--fv-border);
-  background: rgba(255, 255, 255, 0.04);
-  cursor: pointer;
-}
-
-.strip__button:last-child {
-  border-right: 0;
-}
-
-/* Play still reads as the primary action, by its fill rather than its size. */
-.strip__button--play {
-  background: var(--fv-fg);
-  color: var(--fv-accent-fg);
-}
-
-/* Not clipped, unlike the controls: the tooltip stands above the panel and is
-   a child of it, so the end cells round themselves instead. */
-.strip__days {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
   /* The whole panel scrubs on press-and-drag, so a touch drag must not take
      the page with it. */
   touch-action: none;
