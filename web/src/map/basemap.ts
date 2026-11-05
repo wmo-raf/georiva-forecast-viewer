@@ -29,10 +29,19 @@
  * address in this style belongs to anybody but us and OpenFreeMap.
  *
  * Layer order is what keeps the data in the middle of the picture: the ground,
- * then an empty `georiva-data-anchor`, then the boundaries, then the labels.
- * `MapView.vue` inserts its deck layers before the anchor, so data draws above
- * the ground and below both the borders and the names. `basemap.test.ts` holds
- * that order, and the references below, to the invariants they are.
+ * then an empty `georiva-data-anchor`, then the shore's shadow, then the
+ * boundaries, then the labels. `MapView.vue` inserts its deck layers before the
+ * anchor, so data draws above the ground and below the shadow, the borders and
+ * the names. `basemap.test.ts` holds that order, and the references below, to
+ * the invariants they are.
+ *
+ * The shadow sits *above* the anchor because the ground it belongs to is not
+ * always visible. A global field — IFS covers the whole world — paints over
+ * every pixel of the ground, and with land and sea the same grey, a shadow
+ * underneath it would be a land/sea cue that exists only while the data is
+ * regional. It is still below the boundaries: the shadow shades water, the
+ * lines say where a border is, and only the second is a claim. See
+ * `SHADOW_OPACITY` for what drawing it over a palette costs.
  */
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
 
@@ -109,6 +118,24 @@ const SHADOW_TILES = `${import.meta.env.BASE_URL}shore-shadow/{z}/{x}/{y}.png`;
  * this number.
  */
 const SHADOW_MAX_ZOOM = 8;
+/**
+ * How much of the shadow is drawn, now that it is drawn over the data.
+ *
+ * The band's steps were cut for bare grey, where the pixel at the shore is 68%
+ * black (`shore_shadow.py`'s `(173, 130, …)`). Over a palette that same pixel
+ * knocks the forecast down to a third of its colour, in a rim hugging exactly
+ * the coast a landfall is read at — a dark edge that is not on the legend and
+ * reads as a value. At 0.6 the peak is about 40%: the shore still states
+ * itself, and the colours underneath stay recognisably their own.
+ *
+ * One number serves both cases, because the style is a static object and
+ * nothing here knows whether a texture is loaded. The bare-ground shadow —
+ * before the first frame, outside a regional domain, an org with nothing
+ * configured — is softer than it was by the same amount, which is a price
+ * worth paying to keep `MapView.vue` out of the business of painting the
+ * basemap.
+ */
+const SHADOW_OPACITY = 0.6;
 
 /**
  * Labels are dark on a light ground and carry no visible halo — but they *do*
@@ -154,23 +181,19 @@ const textPaint = {
 };
 
 /**
- * The ground: one grey, the larger rivers once there is room for them, and a
- * shadow in the water along every shore. Tunnelled water is dropped: a culvert
- * drawn as a river is just a wrong line.
+ * The ground: one grey, and the larger rivers once there is room for them.
+ * Tunnelled water is dropped: a culvert drawn as a river is just a wrong line.
  *
  * The ocean has no fill — the sea is the background, and the shore is a line.
  * Lakes do, because a flat fill is the one way of saying "water" that cannot
  * fold, spike or stack however intricate the shoreline, and Lake Victoria's is
  * about as intricate as they come.
  *
- * The shadow arrives as a raster (see `SHADOW_TILES`), drawn last in this
- * group so nothing in the ground can paint over it — an earlier version put a
- * shadow first, behind an opaque ocean fill, and rendered nothing at all.
- *
- * It is a shadow and only a shadow: no line, no border, nothing asserted. The
- * coastline over it is still drawn from OpenMapTiles above the anchor, because
- * the shadow says "this is water" and the coastline says "this is where the
- * boundary is", and only the second of those is a claim.
+ * The lake fill stays here, under the anchor, where a field covers it. A
+ * forecast has a value over Lake Victoria and the viewer should draw it rather
+ * than punch a grey disc through it; the lake keeps its shape through the
+ * shadow's ring above, which is the whole reason that ring is rendered from
+ * Natural Earth's lakes as well as its land.
  */
 const ground: LayerSpecification[] = [
   {
@@ -207,20 +230,6 @@ const ground: LayerSpecification[] = [
       ]),
     },
   },
-  {
-    // Faded out above the pyramid's last level rather than overzoomed: an
-    // upscaled shore under our own crisp one would read as a smudge.
-    id: "shore-shadow",
-    type: "raster",
-    source: "shore-shadow",
-    paint: {
-      "raster-opacity": byZoom([
-        [SHADOW_MAX_ZOOM, 1],
-        [SHADOW_MAX_ZOOM + 2, 0],
-      ]),
-      "raster-fade-duration": 0,
-    },
-  },
 ];
 
 /** Where the data goes: between the ground and everything meant to be read over it. */
@@ -229,6 +238,39 @@ const anchor: LayerSpecification = {
   type: "background",
   paint: { "background-opacity": 0 },
 };
+
+/**
+ * The shore's shadow, as a raster (see `SHADOW_TILES`), and the first thing
+ * drawn above the anchor.
+ *
+ * It is a shadow and only a shadow: no line, no border, nothing asserted —
+ * which is why it goes under the boundaries rather than over them. The
+ * coastline above it is still drawn from OpenMapTiles, because the shadow says
+ * "this is water" and the coastline says "this is where the boundary is", and
+ * only the second of those is a claim.
+ *
+ * Over the data, then, and over the wind's particles with it: both deck layers
+ * carry the same `beforeId`, so `deck.gl/maplibre` draws them in one group at
+ * one insertion point and nothing can be slipped between them. Trails in the
+ * coastal band are dimmed by the shadow rather than hidden by it — see
+ * `SHADOW_OPACITY`, which is what makes that bearable.
+ */
+const shadow: LayerSpecification[] = [
+  {
+    // Faded out above the pyramid's last level rather than overzoomed: an
+    // upscaled shore under our own crisp one would read as a smudge.
+    id: "shore-shadow",
+    type: "raster",
+    source: "shore-shadow",
+    paint: {
+      "raster-opacity": byZoom([
+        [SHADOW_MAX_ZOOM, SHADOW_OPACITY],
+        [SHADOW_MAX_ZOOM + 2, 0],
+      ]),
+      "raster-fade-duration": 0,
+    },
+  },
+];
 
 /**
  * The shore and the borders, ported from core's `boundary_layers()` — the
@@ -241,9 +283,9 @@ const anchor: LayerSpecification = {
  * up for restyling.
  *
  * These are the lines the product *asserts*, which is what separates them from
- * the shadow below the anchor: the shadow shades water, these say where a
- * boundary is. It is why the shadow is rendered from land and lakes only, and
- * why no raster on this map is allowed to carry a border of its own.
+ * the shadow below them: the shadow shades water, these say where a boundary
+ * is. It is why the shadow is rendered from land and lakes only, and why no
+ * raster on this map is allowed to carry a border of its own.
  */
 const NOT_MARITIME: ExpressionSpecification = ["!=", ["get", "maritime"], 1];
 const UNDISPUTED: ExpressionSpecification = ["!=", ["get", "disputed"], 1];
@@ -483,5 +525,5 @@ export const GREY_BASEMAP: StyleSpecification = {
     },
   },
   glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
-  layers: [...ground, anchor, ...boundaries, ...placeLabels, ...marineLabels],
+  layers: [...ground, anchor, ...shadow, ...boundaries, ...placeLabels, ...marineLabels],
 };

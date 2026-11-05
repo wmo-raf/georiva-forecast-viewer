@@ -7,7 +7,10 @@
  * The basemap is the viewer's own, bundled rather than fetched (`map/basemap.ts`):
  * one dark grey ground, no variants, no operator override. Both deck layers
  * insert before its `georiva-data-anchor`, so the data draws above the ground
- * and below the borders and the names.
+ * and below the shore's shadow, the borders and the names. Both carry the same
+ * `beforeId` and so share one layer group: deck inserts them at a single point
+ * in the style, and nothing in the basemap can be placed between the raster
+ * and the particles.
  *
  * Both come from value-encoded textures derived per request (core's ADR 0021),
  * one band for the scalar and two for the wind pair (core's #593). Values, not

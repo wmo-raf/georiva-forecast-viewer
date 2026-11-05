@@ -25,8 +25,8 @@ describe("the data anchor", () => {
     const anchor = indexOf(DATA_ANCHOR_ID);
     expect(anchor).toBeGreaterThan(-1);
 
-    const ground = ["ground", "lake", "waterway", "shore-shadow"];
-    const over = ["coastline", "boundary-country", "boundary-disputed", "boundary-state"];
+    const ground = ["ground", "lake", "waterway"];
+    const over = ["shore-shadow", "coastline", "boundary-country", "boundary-disputed", "boundary-state"];
     const names = GREY_BASEMAP.layers.filter((layer) => layer.type === "symbol").map((layer) => layer.id);
 
     expect(names.length).toBeGreaterThan(0);
@@ -42,13 +42,35 @@ describe("the data anchor", () => {
 
 describe("the shore shadow", () => {
   /**
-   * It goes last in the ground, so nothing there can paint over it. An earlier
-   * version put it first, behind an opaque ocean fill, and drew nothing at all
-   * — no error, no warning, just a shore with no shadow.
+   * It goes directly above the anchor: over the data, under the boundaries.
+   *
+   * Under the anchor — which is where it started — a global field paints it
+   * out completely, and with land and sea the same grey that leaves nothing
+   * saying which is which. IFS is global, so this is the ordinary case rather
+   * than the edge one. Under the *boundaries*, because the shadow shades water
+   * and the lines make a claim, and a claim is not something a raster gets to
+   * sit on top of.
+   *
+   * Either mistake is silent: the layer renders, the map looks plausible, and
+   * only a coastline with a forecast over it tells you. An earlier version put
+   * it first in the ground, behind an opaque ocean fill, and drew nothing at
+   * all — no error, no warning, just a shore with no shadow.
    */
-  it("is the last thing drawn in the ground", () => {
+  it("is the first thing drawn above the anchor", () => {
     const anchor = indexOf(DATA_ANCHOR_ID);
-    expect(indexOf("shore-shadow")).toBe(anchor - 1);
+    expect(indexOf("shore-shadow")).toBe(anchor + 1);
+    expect(indexOf("shore-shadow")).toBeLessThan(indexOf("coastline"));
+  });
+
+  /**
+   * Drawn over a palette, so it is drawn at part strength. The band was cut
+   * for bare grey, where the pixel at the shore is 68% black; left at 1 over
+   * data that rim knocks the forecast down to a third of its colour, in a dark
+   * edge along every coast that is not on the legend and reads as a value.
+   */
+  it("is drawn at part strength, because it is drawn over the data", () => {
+    const opacity = paintOf("shore-shadow")["raster-opacity"] as unknown[];
+    expect(opacity.at(-3)).toBe(0.6);
   });
 
   /** It is a raster, because the vector attempt folded the geometry and tore the lakes apart. */
