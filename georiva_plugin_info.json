@@ -1,6 +1,6 @@
 {
   "name": "GeoRiva Forecast Viewer",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Forecast viewer: the first GeoRiva app. Switch models, pick a run, step through lead times on a full-screen map.",
   "author": "WMO RAF",
   "author_url": "https://github.com/wmo-raf",
