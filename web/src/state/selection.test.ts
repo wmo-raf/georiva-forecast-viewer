@@ -13,13 +13,14 @@ const catalogue: Catalogue = {
       name: "2 m temperature",
       kind: "scalar",
       icon: "",
+      decimals: 0,
       sources: [
         { ...ifs, variable: "t2m" },
         { ...wrf, variable: "t2" },
       ],
     },
-    { slug: "rh", name: "Humidity", kind: "scalar", icon: "", sources: [{ ...ifs, variable: "r2" }] },
-    { slug: "wind10", name: "10 m wind", kind: "vector", icon: "wind", sources: [{ ...wrf, u: "u10", v: "v10" }] },
+    { slug: "rh", name: "Humidity", kind: "scalar", icon: "", decimals: 0, sources: [{ ...ifs, variable: "r2" }] },
+    { slug: "wind10", name: "10 m wind", kind: "vector", icon: "wind", decimals: 0, sources: [{ ...wrf, u: "u10", v: "v10" }] },
   ],
 };
 

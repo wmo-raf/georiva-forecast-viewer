@@ -94,6 +94,21 @@ class QuantityIconTests(TestCase):
         self.assertIn("icon", caught.exception.message_dict)
 
 
+class QuantityDecimalsTests(TestCase):
+    """How many decimals the map's place labels round this quantity's values to."""
+
+    def test_whole_numbers_unless_the_operator_says_otherwise(self):
+        self.assertEqual(make_quantity("t2m").decimals, 0)
+
+    def test_up_to_three_are_accepted(self):
+        make_quantity("tp", decimals=3).full_clean()
+
+    def test_more_than_three_are_refused(self):
+        with self.assertRaises(ValidationError) as caught:
+            make_quantity("tp", decimals=4).full_clean()
+        self.assertIn("decimals", caught.exception.message_dict)
+
+
 class QuantityKindTests(TestCase):
     """A quantity's kind is fixed once bound: its bindings are shaped by it."""
 

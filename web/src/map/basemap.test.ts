@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DATA_ANCHOR_ID, greyBasemap } from "./basemap";
+import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "./basemap";
+import { VALUED_CLASSES } from "./places";
 
 /**
  * The style with the shadow in it, which is what most of these are about: the
@@ -192,6 +193,44 @@ describe("asset references", () => {
       for (const font of (layer.layout?.["text-font"] as string[] | undefined) ?? []) {
         expect(available, `${layer.id} asks for a font that is not served`).toContain(font);
       }
+    }
+  });
+});
+
+describe("the places with values", () => {
+  const VALUED = ["city-lg", "city-md", "city-sm", "town"];
+  const placeLayer = (id: string) => layerOf(id) as unknown as { source: string; "source-layer"?: string };
+
+  /**
+   * The viewer fills this source; a label layer still reading the tiles would
+   * draw the name without the value, which looks like a frame that has not
+   * loaded rather than a bug.
+   */
+  it("are read from the source the viewer fills", () => {
+    expect(GREY_BASEMAP.sources[PLACES_SOURCE_ID]).toMatchObject({ type: "geojson" });
+    for (const id of VALUED) {
+      expect(placeLayer(id).source, `${id} does not read the places source`).toBe(PLACES_SOURCE_ID);
+      // A source-layer means nothing to a GeoJSON source, and MapLibre drops the layer for it.
+      expect(placeLayer(id)["source-layer"], `${id} still names a tile layer`).toBeUndefined();
+    }
+  });
+
+  /**
+   * The source holds only what `places.ts` keeps, so a class a layer filters
+   * for that the module drops is a tier of names that silently never appears.
+   */
+  it("are filtered to classes the viewer keeps", () => {
+    for (const id of VALUED) {
+      const classes = JSON.stringify(layerOf(id).filter).match(/"(city|town|village|suburb|island|country)"/g) ?? [];
+      for (const quoted of classes) {
+        expect(VALUED_CLASSES, `${id} filters for a class places.ts drops`).toContain(JSON.parse(quoted));
+      }
+    }
+  });
+
+  it("leave countries and islands on the tiles, with no value", () => {
+    for (const id of ["country-lg", "country-md", "country-sm", "island"]) {
+      expect(placeLayer(id).source, `${id} moved off the tiles`).toBe("openmaptiles");
     }
   });
 });

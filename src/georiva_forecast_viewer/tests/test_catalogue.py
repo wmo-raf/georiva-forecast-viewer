@@ -47,6 +47,7 @@ class CatalogueTests(TestCase):
                     "name": "2 m temperature",
                     "kind": "scalar",
                     "icon": "",
+                    "decimals": 0,
                     "sources": [
                         {
                             "slug": "ifs",
@@ -79,6 +80,13 @@ class CatalogueTests(TestCase):
         [quantity] = self._quantities()
         self.assertEqual(quantity["icon"], "thermometer")
         self.assertEqual(quantity["sources"][0]["descriptor"], "9 km")
+
+    def test_a_quantity_carries_the_decimals_its_place_labels_round_to(self):
+        rain = make_quantity("tp", decimals=1)
+        bind(make_source(make_collection("ecmwf-ifs"), slug="ifs"), rain, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["decimals"], 1)
 
     def test_an_unset_icon_and_descriptor_are_blank_strings(self):
         temperature = make_quantity("t2m")

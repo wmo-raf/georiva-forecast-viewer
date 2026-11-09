@@ -22,6 +22,14 @@
  * frame that arrived. A step is "ready" only once both have settled, so
  * playback never runs ahead of the wind; a failed load leaves the frame on
  * screen rather than blanking the map.
+ *
+ * The scalar's slot also feeds the names: every city and town on screen
+ * carries the value under it (`map/places.ts`), read off the texture already
+ * drawn, so a value costs no request. They are refilled when the frame
+ * changes, when the view settles and when basemap tiles arrive, and carry a
+ * value only while the texture on screen is the selected source's variable —
+ * a quantity switch keeps the old frame up until the new one lands, and its
+ * numbers must not sit under the new legend meanwhile.
  */
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 // MapLibre 6 is ESM-only and has no default export, so the namespace import.
@@ -29,14 +37,16 @@ import { MapLibreOverlay } from "@deck.gl/maplibre";
 // its worker from a real URL, which `import.meta.url` cannot resolve inside
 // Vite's module graph.
 import * as maplibregl from "maplibre-gl";
-import { setWorkerUrl } from "maplibre-gl";
+import { setWorkerUrl, type FilterSpecification, type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { ViewerConfig } from "../api/types";
-import { DATA_ANCHOR_ID, greyBasemap } from "../map/basemap";
+import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
 import { particleCount, type Bounds } from "../map/particles";
+import { placesWithValues, VALUED_CLASSES } from "../map/places";
+import { readValue } from "../map/sample";
 import { loadTexture, type Texture } from "../map/texture";
 import { attachMap } from "../map/zoom";
 import { useViewer } from "../state/store";
@@ -73,15 +83,20 @@ const viewport = ref<Bounds | null>(null);
 let map: maplibregl.Map | null = null;
 let overlay: MapLibreOverlay | null = null;
 
-/** One texture under one URL: what is drawn, whether a newer frame is in flight, and the last failure. */
+/**
+ * One texture under one URL: what is drawn, what it is a frame *of*, whether a
+ * newer frame is in flight, and the last failure.
+ */
 interface Slot {
   texture: Ref<Texture | null>;
+  /** The source and variable the drawn texture shows, as `follow` was told when it loaded. */
+  shows: Ref<string | null>;
   pending: Ref<boolean>;
   error: Ref<string | null>;
 }
 
 function newSlot(): Slot {
-  return { texture: shallowRef(null), pending: ref(false), error: ref(null) };
+  return { texture: shallowRef(null), shows: ref(null), pending: ref(false), error: ref(null) };
 }
 
 const raster = newSlot();
@@ -146,22 +161,25 @@ function repaint() {
  * drawn. An empty URL clears the slot, which is how the wind toggle and a
  * model without a wind binding both take the particles off the map.
  */
-function follow(url: ComputedRef<string | null>, into: Slot) {
+function follow(url: ComputedRef<string | null>, into: Slot, shows: () => string | null = () => null) {
   watch(
     url,
     async (next) => {
       if (!next) {
         into.texture.value = null;
+        into.shows.value = null;
         into.error.value = null;
         into.pending.value = false;
         repaint();
         return;
       }
       into.pending.value = true;
+      const of = shows();
       try {
         const loaded = await loadTexture(next);
         if (url.value !== next) return;
         into.texture.value = loaded;
+        into.shows.value = of;
         into.error.value = null;
       } catch (error) {
         if (url.value !== next) return;
@@ -174,7 +192,14 @@ function follow(url: ComputedRef<string | null>, into: Slot) {
   );
 }
 
-follow(viewer.textureUrl, raster);
+/** The selected source's scalar variable, which is what a value under a name must be a reading of. */
+const selectedScalar = computed(() => {
+  const source = viewer.source.value;
+  const variable = viewer.variable.value;
+  return source && variable ? `${source.catalog}/${source.collection}/${variable}` : null;
+});
+
+follow(viewer.textureUrl, raster, () => selectedScalar.value);
 follow(viewer.windTextureUrl, wind);
 
 const ready = computed(() => !raster.pending.value && !wind.pending.value);
@@ -188,6 +213,35 @@ watch(
   () => [viewer.state.wind.speed, viewer.state.wind.width, viewer.state.wind.life, viewer.state.wind.density],
   repaint,
 );
+
+/** The place classes the label layers draw, as a filter on the basemap's own tiles. */
+const VALUED_PLACES = ["match", ["get", "class"], VALUED_CLASSES, true, false] as FilterSpecification;
+
+let placesQueued = false;
+
+/**
+ * Refill the names from the place features loaded now and the frame on screen.
+ *
+ * At most once per animation frame: tile arrivals come in bursts, and a burst
+ * is one refill. The places are whatever tiles are loaded, so a pan fills in as
+ * its tiles arrive rather than waiting for the gesture to end.
+ */
+function refreshPlaces() {
+  if (placesQueued || !map) return;
+  placesQueued = true;
+  requestAnimationFrame(() => {
+    placesQueued = false;
+    const target = map?.getSource<GeoJSONSource>(PLACES_SOURCE_ID);
+    if (!map || !target) return;
+    const features = map.querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES });
+    const texture = raster.texture.value;
+    const current = texture && raster.shows.value === selectedScalar.value ? texture : null;
+    const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat) : () => null;
+    target.setData(placesWithValues(features, valueAt, viewer.quantity.value?.decimals ?? 0));
+  });
+}
+
+watch([raster.texture, raster.shows, selectedScalar, () => viewer.quantity.value?.decimals], refreshPlaces);
 
 function readViewport() {
   if (!map) return;
@@ -208,17 +262,21 @@ onMounted(() => {
   });
   // No NavigationControl: zoom lives in the toolbar, which drives this map
   // through `map/zoom.ts`.
-  attachMap(map);
-  // On `moveend`, not `move`: the budget only moves in powers of two, and
+  attachMap(map);  // On `moveend`, not `move`: the budget only moves in powers of two, and
   // resizing it mid-gesture would restart every trail (see `map/particles.ts`).
   map.on("moveend", () => {
     readViewport();
     repaint();
+    refreshPlaces();
+  });
+  map.on("sourcedata", (event) => {
+    if (event.sourceId === "openmaptiles" && event.isSourceLoaded) refreshPlaces();
   });
   map.once("load", () => {
     readViewport();
     overlay = new MapLibreOverlay({ interleaved: true, layers: layers() });
     map!.addControl(overlay);
+    refreshPlaces();
   });
 });
 

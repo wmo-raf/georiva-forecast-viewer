@@ -51,7 +51,8 @@ class QuantityAdminTests(TestCase):
 
     def test_a_quantity_created_here_belongs_to_this_organisation(self):
         response = self.client.post(
-            reverse(f"{QUANTITY}:add"), {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "order": "0"}
+            reverse(f"{QUANTITY}:add"),
+            {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "decimals": "0", "order": "0"},
         )
         if response.status_code == 200:
             self.fail(f"form did not save: {response.context['form'].errors}")

@@ -10,7 +10,7 @@
 import { computed, reactive, watch } from "vue";
 import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
 import { loadCatalogue, loadEdr, loadRuns } from "../api/client";
-import type { Catalogue, EdrCollection, EdrParameter, Source } from "../api/types";
+import type { Catalogue, EdrCollection, EdrParameter, Quantity, Source } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
 import { buildTimeline, stepIndex, type Timeline } from "./timeline";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
@@ -72,6 +72,11 @@ const scalarView = computed<Catalogue | null>(() =>
 );
 
 const scalarQuantities = computed(() => scalarView.value?.quantities ?? []);
+
+/** The scalar quantity on the map. */
+const quantity = computed<Quantity | undefined>(() =>
+  state.selection ? scalarQuantities.value.find((q) => q.slug === state.selection?.quantity) : undefined,
+);
 
 const source = computed<Source | undefined>(() =>
   scalarView.value && state.selection ? sourceOf(scalarView.value, state.selection) : undefined,
@@ -234,6 +239,7 @@ export function useViewer() {
     state,
     scalarQuantities,
     scalarView,
+    quantity,
     source,
     windBinding,
     windToDraw,

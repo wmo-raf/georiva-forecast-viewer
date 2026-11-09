@@ -27,6 +27,8 @@ export interface Quantity {
   kind: QuantityKind;
   /** A name from the plugin's curated set, or blank. */
   icon: string;
+  /** Decimal places for the values under place names on the map; the operator's choice, 0 by default. */
+  decimals: number;
   sources: Source[];
 }
 

@@ -19,6 +19,7 @@ are per Site, which is the organisation (core's ``GeoRivaSettings``).
 """
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
 from django.db import models
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -61,6 +62,15 @@ class Quantity(models.Model):
         default="",
         validators=[validate_icon],
         help_text="The glyph beside the name in the viewer's list.",
+    )
+    #: How the map's place labels round this quantity's values. The operator's
+    #: call, because the precision a forecaster reads depends on the quantity —
+    #: a temperature to the degree, a rainfall to the tenth of a millimetre —
+    #: and nothing EDR says about a variable carries it.
+    decimals = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MaxValueValidator(3)],
+        help_text="Decimal places in the values shown under place names on the map, e.g. 0 for '24', 1 for '0.4'.",
     )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")
 
