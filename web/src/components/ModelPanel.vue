@@ -24,10 +24,19 @@ function pick(slug: string) {
 
 <template>
   <div class="model" :class="{ 'model--open': open }" @keydown.escape="open = false">
-    <button type="button" class="model__toggle" :aria-expanded="open" aria-controls="model-panel" @click="open = !open">
+    <button
+      type="button"
+      class="model__toggle"
+      :aria-expanded="open"
+      aria-controls="model-panel"
+      :disabled="!viewer.source.value"
+      @click="open = !open"
+    >
       <span class="model__eyebrow">Select model</span>
       <span class="model__current">
-        <span class="model__name">{{ viewer.source.value?.name ?? "—" }}</span>
+        <span v-if="viewer.source.value" class="model__name">{{ viewer.source.value.name }}</span>
+        <!-- Until the catalogue lands: the name's line, at a name's length. -->
+        <span v-else class="skel skel--line model__skel" aria-label="Loading models"></span>
         <span v-if="viewer.source.value?.descriptor" class="model__descriptor">{{ viewer.source.value.descriptor }}</span>
         <ChevronUp class="model__chevron" :size="16" aria-hidden="true" />
       </span>

@@ -95,6 +95,54 @@ button {
   transform: none;
 }
 
+/* ---- skeletons ---- */
+
+/* What stands in for a piece of the frame while its data is on its way: the
+   piece's own chrome at its final size, with these shapes where the content
+   will be. They pulse while something is coming and stop when nothing is
+   (a failed load), so the pulse never promises what will not arrive. */
+.skel {
+  display: block;
+  background: rgba(255, 255, 255, 0.1);
+  animation: fv-pulse 1.4s ease-in-out infinite;
+}
+
+.skel--still {
+  animation: none;
+}
+
+.skel--line {
+  height: 10px;
+  border-radius: 999px;
+}
+
+.skel--dot {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+/* A whole panel's inside, rounded with it. */
+.skel--fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@keyframes fv-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}
+
 /* ---- left rail ---- */
 
 /* The pill and the rail it opens, stacked in the top-left corner. Each is as
@@ -214,6 +262,15 @@ button {
   box-sizing: border-box;
 }
 
+/* The skeleton rows are rows' size and nothing more: not a target. */
+.rail__item--skel {
+  cursor: default;
+}
+
+.layers__skel {
+  width: 96px;
+}
+
 .rail__item:hover {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -278,6 +335,16 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.model__skel {
+  width: 110px;
+  /* The name's line height, so the toggle is its loaded height already. */
+  margin: 3px 0;
+}
+
+.model__toggle:disabled {
+  cursor: default;
 }
 
 .model__name {
@@ -586,6 +653,15 @@ button {
 /* One pill, no padding of its own: the colour reaches its edge and the
    rounding clips it. The legend is a flow item in `.bottom`, so nothing here
    reserves space for it or has to be told how tall the day strip is. */
+/* The legend's slot with no legend in it: the same box, so nothing moves. */
+.legend--skel {
+  position: relative;
+}
+
+.legend--none {
+  visibility: hidden;
+}
+
 .legend {
   display: flex;
   align-items: stretch;
@@ -712,6 +788,8 @@ button {
    takes the rest of the row. */
 .corner {
   flex: 0 0 auto;
+  /* Pinned right, whether the strip beside it is there yet or not. */
+  margin-left: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -785,6 +863,11 @@ button {
   position: relative;
   display: flex;
   align-items: stretch;
+  /* Fixed, for the widest run name (`RUN 30 Nov 23:00Z`) and the chevron with
+     room for a wider system font than this was measured in (Segoe UI), so
+     the play button and the days beside it never move — not between runs, not
+     between models with one run and several, not when the skeleton fills in. */
+  width: 184px;
   height: var(--fv-bar-h);
   box-sizing: border-box;
   background: var(--fv-panel);
@@ -833,7 +916,11 @@ button {
    something to choose. */
 .run__value {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
   padding: 0 12px 0 10px;
   font-size: 12px;
   font-weight: 600;
@@ -919,6 +1006,15 @@ button {
    own height. It is filled rather than panelled: it is the only thing to
    press, so it does not need a panel's border to be found, and a solid fill
    has nothing to blur behind it. */
+.strip__play:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.run__skel {
+  width: 80px;
+}
+
 .strip__play {
   flex: 0 0 auto;
   display: grid;

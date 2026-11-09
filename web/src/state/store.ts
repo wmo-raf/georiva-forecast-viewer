@@ -95,6 +95,18 @@ const windToDraw = computed<Source | null>(() => (state.wind.on ? windBinding.va
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
 
+/**
+ * Something the frame is waiting for is on its way: the catalogue, or the
+ * selected source's runs and EDR description. The pieces that need it stand in
+ * as skeletons at their final size meanwhile, so nothing moves when it lands.
+ */
+const loading = computed(
+  () => state.status === "loading" || (!!source.value && !timelineCurrent.value && !state.sourceError),
+);
+
+/** The source's load failed and nothing is coming: skeletons stay, but stop promising. */
+const stalled = computed(() => !!state.sourceError && !timelineCurrent.value);
+
 const run = computed(() => {
   if (!timelineCurrent.value) return null;
   return state.timeline?.runs.find((r) => r.reference_time === state.timeline?.selected) ?? null;
@@ -173,6 +185,8 @@ watch(
   (current) => {
     if (!current || keyOf(current) === state.timelineFor) return;
     state.playing = false;
+    // The last source's failure is not this one's.
+    state.sourceError = null;
     void loadSource(current);
   },
   { immediate: true },
@@ -223,6 +237,9 @@ export function useViewer() {
     source,
     windBinding,
     windToDraw,
+    timelineCurrent,
+    loading,
+    stalled,
     run,
     times,
     time,

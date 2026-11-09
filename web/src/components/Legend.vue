@@ -6,6 +6,9 @@
  * over — so a palette edited in the admin shows up here with no change in the
  * app. Which of the two shapes it takes, and every colour on it, is decided in
  * `ui/legend.ts`; this only draws what that returns.
+ *
+ * Its slot is held whatever the state, so nothing above it moves: a skeleton
+ * while loading, an invisible placeholder for a quantity with no palette.
  */
 import { computed } from "vue";
 import { legendBar } from "../ui/legend";
@@ -22,7 +25,10 @@ const bar = computed(() =>
 </script>
 
 <template>
-  <div class="legend" v-if="bar">
+  <!-- The slot is always there, at the legend's height, so the picker and the
+       toolbar standing on it never move: a skeleton while the description is
+       on its way, empty when the quantity has no palette to show. -->
+  <div v-if="bar" class="legend">
     <span class="legend__unit" v-if="unit">{{ unit }}</span>
 
     <!-- A classification: one block per class, its lower boundary on it. -->
@@ -55,4 +61,8 @@ const bar = computed(() =>
       </span>
     </div>
   </div>
+  <div v-else-if="viewer.loading.value || viewer.stalled.value" class="legend legend--skel" aria-hidden="true">
+    <span class="skel skel--fill" :class="{ 'skel--still': viewer.stalled.value }"></span>
+  </div>
+  <div v-else class="legend legend--none" aria-hidden="true"></div>
 </template>

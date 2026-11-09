@@ -14,6 +14,9 @@
  * textures, the raster and the wind — so a slow one stretches the frame rather
  * than skipping it, and the wind never lags the colours. Textures load lazily
  * per step.
+ *
+ * Before its runs land — on load, and on every model switch — it stands as a
+ * skeleton at its final size, so the bar never changes shape underneath it.
  */
 import { Pause, Play } from "lucide-vue-next";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
@@ -227,5 +230,27 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </div>
-  <div class="strip strip--empty" v-else-if="viewer.state.timeline">No complete run yet for this model.</div>
+  <!-- Only once this source's own timeline is in: during a switch the last
+       source's timeline is still held, and its emptiness is not this one's. -->
+  <div class="strip strip--empty" v-else-if="viewer.timelineCurrent.value">No complete run yet for this model.</div>
+  <!-- Loading, or a load that failed: the strip at its final size, so neither
+       it nor the corner beside it moves when the runs land. -->
+  <div class="strip" v-else aria-hidden="true">
+    <div class="runpick">
+      <div class="run">
+        <span class="run__eyebrow">Run</span>
+        <span class="run__value">
+          <span class="skel skel--line run__skel" :class="{ 'skel--still': viewer.stalled.value }"></span>
+        </span>
+      </div>
+    </div>
+    <div class="strip__timeline">
+      <button type="button" class="strip__play" disabled tabindex="-1">
+        <Play :size="16" aria-hidden="true" />
+      </button>
+      <div class="strip__days">
+        <span class="skel skel--fill" :class="{ 'skel--still': viewer.stalled.value }"></span>
+      </div>
+    </div>
+  </div>
 </template>
