@@ -1016,7 +1016,8 @@ button {
 
 /* The panel's inside, rounded as it is, so the track clips to its corners
    (the panel itself cannot clip: the label stands outside it). The track is
-   the bottom 3px of it, and the fill runs along it to the playhead. */
+   the top 3px of it, right under the label's arrow, and the fill runs along
+   it to the playhead. */
 .strip__progress {
   position: absolute;
   inset: 0;
@@ -1029,7 +1030,7 @@ button {
 .strip__fill {
   position: absolute;
   left: 0;
-  bottom: 0;
+  top: 0;
   height: 3px;
 }
 

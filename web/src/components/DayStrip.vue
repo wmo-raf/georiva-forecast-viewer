@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The timeline: one cell per day of the run, a progress fill along the bottom
+ * The timeline: one cell per day of the run, a progress fill along the top
  * that reaches the step's hour inside its cell, a floating label with the
  * exact step, and play.
  *
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
           <span class="strip__weekday">{{ cell.weekday }}</span>
         </button>
         <!-- Progress, as a video player draws it: a thin track along the
-             bottom, filled up to the playhead. The fill's end is the
+             top, filled up to the playhead. The fill's end is the
              position; the label above points at it and is the handle. -->
         <div class="strip__progress" aria-hidden="true">
           <div
