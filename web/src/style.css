@@ -103,13 +103,100 @@ button {
 
 /* ---- left rail ---- */
 
-.rail {
+/* The pill and the rail it opens, stacked in the top-left corner. Each is as
+   wide as its own content; neither is sized to match the other. */
+.layers {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 4;
-  width: min(300px, calc(100vw - 32px));
-  max-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+/* Names the quantity on the map, with the rail's own chrome and rounding. */
+.layers__pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--fv-bar-h);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px 0 12px;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
+  color: var(--fv-fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.layers__pill:hover {
+  background: var(--fv-panel-solid);
+}
+
+.layers__pill:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: -2px;
+}
+
+.layers__icon {
+  flex: 0 0 auto;
+  color: var(--fv-accent);
+}
+
+.layers__name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layers__chevron {
+  flex: 0 0 auto;
+  color: var(--fv-muted);
+  transition: transform 150ms ease;
+}
+
+.layers__chevron--open {
+  transform: rotate(180deg);
+}
+
+.rail-enter-active,
+.rail-leave-active {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.rail-enter-from,
+.rail-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layers__chevron,
+  .rail-enter-active,
+  .rail-leave-active {
+    transition: none;
+  }
+}
+
+.rail {
+  /* As wide as the longest label needs, and no wider than the cap. */
+  width: max-content;
+  max-width: min(240px, 100%);
+  box-sizing: border-box;
+  /* Clear of the pill above it and the bottom bar below. */
+  max-height: calc(100vh - 190px);
   overflow: auto;
   background: var(--fv-panel);
   border: 1px solid var(--fv-border);
@@ -117,15 +204,6 @@ button {
   box-shadow: var(--fv-shadow);
   padding: 10px 8px;
   backdrop-filter: blur(10px);
-}
-
-.rail__org {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fv-muted);
-  padding: 4px 10px 10px;
 }
 
 .rail__item,
@@ -163,7 +241,11 @@ button {
 
 .rail__label {
   flex: 1 1 auto;
+  min-width: 0;
   font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rail__wind {
