@@ -81,8 +81,16 @@ export function visibleFraction(data: Bounds, viewport: Bounds): number {
  * `null` for either rectangle — no texture yet, or no map yet — spends the base
  * count, as does data entirely off screen, where every particle would be
  * dropped anyway and a boost would only cost GPU memory.
+ *
+ * `density` is the user's multiplier on top (the wind dropup's Sparse, Normal
+ * and Dense). It scales the whole budget, so the compensation between a
+ * regional and a global grid holds at every density.
  */
-export function particleCount(data: Bounds | null, viewport: Bounds | null): number {
+export function particleCount(data: Bounds | null, viewport: Bounds | null, density = 1): number {
+  return Math.round(automaticBudget(data, viewport) * density);
+}
+
+function automaticBudget(data: Bounds | null, viewport: Bounds | null): number {
   if (!data || !viewport) return BASE_PARTICLES;
   const fraction = visibleFraction(data, viewport);
   if (fraction <= 0) return BASE_PARTICLES;

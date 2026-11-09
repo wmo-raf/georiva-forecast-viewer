@@ -65,3 +65,10 @@ describe("the particle budget follows the data's share of the view", () => {
     expect(particleCount(REGION, [-120, 20, -100, 40])).toBe(BASE_PARTICLES);
   });
 });
+
+describe("the user's density scales the automatic budget", () => {
+  it("halves and doubles the budget, boost included", () => {
+    expect(particleCount(WORLD, WORLD, 0.5)).toBe(BASE_PARTICLES / 2);
+    expect(particleCount([0, 0, 10, 10], [0, 0, 20, 20], 2)).toBe(BASE_PARTICLES * 4 * 2);
+  });
+});

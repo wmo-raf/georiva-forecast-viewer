@@ -1,49 +1,73 @@
 <script setup lang="ts">
 /**
- * The left rail: who this is, the quantities a user can show, and the wind toggle.
- * The map draws a fixed pair, the selected scalar quantity plus wind, so the
- * list is scalar quantities only and wind is a switch beside it.
+ * The left rail: the quantities a user can show. The map draws a fixed pair,
+ * the selected scalar quantity plus wind, so the list is scalar quantities
+ * only; wind is the toolbar's, which owns its switch and its settings.
+ *
+ * It collapses behind a pill that names the quantity on the map. The pill is
+ * the only thing that opens or closes it: picking a quantity, Escape and the
+ * map all leave it as it is. It starts open on a wide viewport
+ * and closed on a narrow one, decided once at load and never stored.
  */
-import { Wind } from "lucide-vue-next";
-import { computed } from "vue";
+import { ChevronDown } from "lucide-vue-next";
+import { computed, ref } from "vue";
 import { useViewer } from "../state/store";
 import { iconFor } from "../ui/icons";
 
+/** The narrow breakpoint, the same one `style.css` switches layout at. */
+const NARROW = "(max-width: 720px)";
+
 const viewer = useViewer();
-const orgName = computed(() => viewer.state.catalogue?.config.org_name ?? "");
 const selected = computed(() => viewer.state.selection?.quantity ?? null);
-const windAvailable = computed(() => viewer.windBinding.value !== null);
+const selectedQuantity = computed(() => viewer.scalarQuantities.value.find((q) => q.slug === selected.value) ?? null);
+
+const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).matches);
 </script>
 
 <template>
-  <aside class="rail">
-    <div class="rail__org">{{ orgName }}</div>
-    <div class="rail__list" role="radiogroup" aria-label="Quantity">
-      <button
-        v-for="q in viewer.scalarQuantities.value"
-        :key="q.slug"
-        type="button"
-        role="radio"
-        :aria-checked="q.slug === selected"
-        class="rail__item"
-        :class="{ 'rail__item--selected': q.slug === selected }"
-        @click="viewer.pickQuantity(q.slug)"
-      >
-        <component :is="iconFor(q.icon)" class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
-        <span class="rail__label">{{ q.name }}</span>
-      </button>
-    </div>
-    <label class="rail__wind" :class="{ 'rail__wind--off': !windAvailable }">
-      <Wind class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
-      <span class="rail__label">Wind</span>
-      <input
-        type="checkbox"
-        class="rail__switch"
-        :checked="viewer.state.windOn && windAvailable"
-        :disabled="!windAvailable"
-        :title="windAvailable ? 'Wind particles' : 'This model has no wind binding'"
-        @change="viewer.setWind(($event.target as HTMLInputElement).checked)"
+  <div class="layers">
+    <button
+      type="button"
+      class="layers__pill"
+      :aria-expanded="open"
+      aria-controls="layers-menu"
+      :title="open ? 'Hide layers' : 'Show layers'"
+      @click="open = !open"
+    >
+      <component
+        :is="iconFor(selectedQuantity?.icon ?? '')"
+        class="layers__icon"
+        :size="16"
+        :stroke-width="1.75"
+        aria-hidden="true"
       />
-    </label>
-  </aside>
+      <span class="layers__name">{{ selectedQuantity?.name }}</span>
+      <ChevronDown
+        class="layers__chevron"
+        :class="{ 'layers__chevron--open': open }"
+        :size="16"
+        :stroke-width="2"
+        aria-hidden="true"
+      />
+    </button>
+    <Transition name="rail">
+      <aside v-show="open" id="layers-menu" class="rail">
+        <div class="rail__list" role="radiogroup" aria-label="Quantity">
+          <button
+            v-for="q in viewer.scalarQuantities.value"
+            :key="q.slug"
+            type="button"
+            role="radio"
+            :aria-checked="q.slug === selected"
+            class="rail__item"
+            :class="{ 'rail__item--selected': q.slug === selected }"
+            @click="viewer.pickQuantity(q.slug)"
+          >
+            <component :is="iconFor(q.icon)" class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
+            <span class="rail__label" :title="q.name">{{ q.name }}</span>
+          </button>
+        </div>
+      </aside>
+    </Transition>
+  </div>
 </template>

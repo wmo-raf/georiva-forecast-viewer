@@ -9,17 +9,11 @@
   --fv-error: #ff8a80;
   --fv-radius: 12px;
   --fv-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  /* The bottom bar's geometry, named once. Anything that has to stand clear of
-     the bar reads these rather than restating a number that then goes stale
-     the next time the bar changes height. `--fv-bar-h` is one pill's height;
-     `--fv-bar-total` the whole bar's, which is the same until it wraps onto
-     two rows on a narrow viewport. */
+  /* One pill's height in the bottom bar, named once. */
   --fv-bar-h: 32px;
-  /* The bar's measured height, written by `App.vue` from the footer itself:
-     it wraps onto two and three rows as the width allows, and nothing in CSS
-     can see which. Anything standing clear of the bar reads this. The value
-     here is the one-row case, used until the first measurement lands. */
-  --fv-bar-total: var(--fv-bar-h);
+  /* The bottom-right column — model picker, toolbar, legend — is this wide,
+     which is the legend's: wide enough for its labels (`ui/legend.ts`). */
+  --fv-corner-w: 360px;
   /* The narrowest the days are worth drawing: below this the run pill gives
      up its place on the line. Three cells of a two-digit date need about
      170px, so this leaves room to spare at the moment it wraps. */
@@ -93,23 +87,110 @@ button {
   margin-top: 4px;
 }
 
-/* Beside the rail rather than over it, under the zoom controls. */
+/* Beside the rail rather than over it, in the top-right corner. */
 .notice--floating {
   top: 16px;
   left: auto;
-  right: 64px;
+  right: 16px;
   transform: none;
 }
 
 /* ---- left rail ---- */
 
-.rail {
+/* The pill and the rail it opens, stacked in the top-left corner. Each is as
+   wide as its own content; neither is sized to match the other. */
+.layers {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 4;
-  width: min(300px, calc(100vw - 32px));
-  max-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+/* Names the quantity on the map, with the rail's own chrome and rounding. */
+.layers__pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--fv-bar-h);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px 0 12px;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
+  color: var(--fv-fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.layers__pill:hover {
+  background: var(--fv-panel-solid);
+}
+
+.layers__pill:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: -2px;
+}
+
+.layers__icon {
+  flex: 0 0 auto;
+  color: var(--fv-accent);
+}
+
+.layers__name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layers__chevron {
+  flex: 0 0 auto;
+  color: var(--fv-muted);
+  transition: transform 150ms ease;
+}
+
+.layers__chevron--open {
+  transform: rotate(180deg);
+}
+
+.rail-enter-active,
+.rail-leave-active {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.rail-enter-from,
+.rail-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layers__chevron,
+  .rail-enter-active,
+  .rail-leave-active {
+    transition: none;
+  }
+}
+
+.rail {
+  /* As wide as the longest label needs, and no wider than the cap. */
+  width: max-content;
+  max-width: min(240px, 100%);
+  box-sizing: border-box;
+  /* Clear of the pill above it and the bottom bar below. */
+  max-height: calc(100vh - 190px);
   overflow: auto;
   background: var(--fv-panel);
   border: 1px solid var(--fv-border);
@@ -119,17 +200,7 @@ button {
   backdrop-filter: blur(10px);
 }
 
-.rail__org {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fv-muted);
-  padding: 4px 10px 10px;
-}
-
-.rail__item,
-.rail__wind {
+.rail__item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -143,8 +214,7 @@ button {
   box-sizing: border-box;
 }
 
-.rail__item:hover,
-.rail__wind:hover {
+.rail__item:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -163,36 +233,19 @@ button {
 
 .rail__label {
   flex: 1 1 auto;
+  min-width: 0;
   font-size: 14px;
-}
-
-.rail__wind {
-  margin-top: 6px;
-  border-top: 1px solid var(--fv-border);
-  border-radius: 0 0 10px 10px;
-  padding-top: 12px;
-}
-
-.rail__wind--off {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.rail__switch {
-  accent-color: var(--fv-accent);
-  width: 34px;
-  height: 18px;
-  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- model panel ---- */
 
-/* Stands clear of the bottom bar, whatever height the bar is. */
+/* The top of the corner column, at its own width. The options open upward, and
+   the column is anchored at the bottom, so they grow it upward and nothing
+   below them moves. */
 .model {
-  position: absolute;
-  right: 16px;
-  bottom: calc(var(--fv-bar-bottom) + var(--fv-bar-total) + 10px);
-  z-index: 4;
   display: flex;
   /* The toggle comes first in the DOM, so Tab reaches it before the options it opens; drawn above them. */
   flex-direction: column-reverse;
@@ -284,6 +337,250 @@ button {
   background: rgba(47, 182, 201, 0.22);
 }
 
+/* ---- toolbar ---- */
+
+/* The middle of the corner column. The wind dropup floats above it rather than
+   in the column's flow, so opening it moves nothing — it covers the model
+   picker while it is open. */
+.tools {
+  position: relative;
+  /* It grows a button at a time as tools are added. Past this it clips —
+     deliberately: what a toolbar that full should do is decided then. */
+  max-width: var(--fv-corner-w);
+}
+
+.tools__bar {
+  display: flex;
+  align-items: stretch;
+  height: var(--fv-bar-h);
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0 2px;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.tools__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* A fixed step per tool, so the bar's width is the count of its tools. */
+  flex: 0 0 auto;
+  min-width: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fv-fg);
+  cursor: pointer;
+}
+
+.tools__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tools__button:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.tools__button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tools__button--wind {
+  /* Icon and caret: as wide as the pair needs. */
+  padding: 0 8px;
+  color: var(--fv-muted);
+}
+
+.tools__button--active {
+  color: var(--fv-accent);
+}
+
+.tools__caret {
+  color: var(--fv-muted);
+  transition: transform 150ms ease;
+}
+
+.tools__caret--open {
+  transform: rotate(180deg);
+}
+
+/* ---- wind dropup ---- */
+
+.wind {
+  position: absolute;
+  /* Wider than the toolbar, so it hangs off the toolbar's right edge. */
+  right: 0;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  box-sizing: border-box;
+  background: var(--fv-panel-solid);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  padding: 10px 12px 8px;
+  font-size: 13px;
+}
+
+.wind__row--switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fv-border);
+  cursor: pointer;
+}
+
+.wind__title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* A track and a knob, drawn on the checkbox itself so keyboard and screen
+   readers keep the native control (`role="switch"` names it). */
+.wind__switch {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 18px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.wind__switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fv-fg);
+  transition: transform 150ms ease;
+}
+
+.wind__switch:checked {
+  background: var(--fv-accent);
+}
+
+.wind__switch:checked::before {
+  transform: translateX(16px);
+}
+
+.wind__switch:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: 2px;
+}
+
+.wind__settings {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.wind__settings:disabled {
+  opacity: 0.4;
+}
+
+.wind__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.wind__label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fv-muted);
+  font-size: 12px;
+}
+
+.wind__value {
+  color: var(--fv-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.wind__slider {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--fv-accent);
+}
+
+.wind__ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fv-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.wind__segments {
+  display: flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wind__segment {
+  flex: 1 1 0;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fv-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wind__segment--selected {
+  background: rgba(47, 182, 201, 0.22);
+  color: var(--fv-fg);
+}
+
+.wind__settings:disabled .wind__segment {
+  cursor: default;
+}
+
+.wind__reset {
+  display: block;
+  margin: 12px 0 0 auto;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fv-accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wind__reset:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tools__caret,
+  .wind__switch,
+  .wind__switch::before {
+    transition: none;
+  }
+}
+
 /* ---- legend ---- */
 
 /* One pill, no padding of its own: the colour reaches its edge and the
@@ -295,8 +592,8 @@ button {
   height: 22px;
   /* Fixed, so the pill's edge never moves with the palette or the variable;
      everything inside divides what is there. It gives way only to a viewport
-     too narrow to hold it, where `100%` is the footer's own width. */
-  width: 360px;
+     too narrow to hold it, where `100%` is the corner column's width. */
+  width: var(--fv-corner-w);
   max-width: 100%;
   /* So the border is inside the fixed width, and inside the fallback too. */
   box-sizing: border-box;
@@ -400,11 +697,33 @@ button {
   display: flex;
   align-items: flex-end;
   gap: 10px;
+  /* The corner column makes the bar tall; the empty space beside it, above
+     the days, belongs to the map. */
+  pointer-events: none;
 }
 
-/* Its width is its own; the time control takes the rest. */
-.bottom > .legend {
+.bottom > * {
+  pointer-events: auto;
+}
+
+/* The bottom-right column: model picker, toolbar and legend on the bar's
+   baseline. The column is the legend's width; the picker and toolbar keep
+   their own, right-aligned, so neither is stretched to it. The time control
+   takes the rest of the row. */
+.corner {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: var(--fv-corner-w);
+  max-width: 100%;
+  /* Beside the narrower picker and toolbar, the column is empty: the map's. */
+  pointer-events: none;
+}
+
+.corner > * {
+  pointer-events: auto;
 }
 
 /* Layout only — no background, no border, no padding. The chrome belongs to
@@ -453,9 +772,17 @@ button {
    its own so the label reaches the edge and the rounding clips it. The bar now
    carries two times, the run and the step, so this one is named — a bare time
    here would read as the one on the map. */
-.run {
+
+/* The pill and the list it opens. The pill clips its own contents to its
+   rounding, so the list stands beside it here rather than inside it. */
+.runpick {
   position: relative;
   flex: 0 0 auto;
+  display: flex;
+}
+
+.run {
+  position: relative;
   display: flex;
   align-items: stretch;
   height: var(--fv-bar-h);
@@ -467,6 +794,26 @@ button {
   backdrop-filter: blur(10px);
   overflow: hidden;
   font-variant-numeric: tabular-nums;
+}
+
+/* As a button: the pill's look, not the browser's. */
+.run--choosable {
+  padding: 0;
+  color: var(--fv-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run--choosable:hover {
+  background: var(--fv-panel-solid);
+}
+
+/* Inset, in the pill's own shape, so it reads as part of the pill rather
+   than a halo around it. */
+.run--choosable:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: -2px;
 }
 
 .run__eyebrow {
@@ -492,46 +839,78 @@ button {
   font-weight: 600;
 }
 
-.run__select {
-  height: 100%;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--fv-fg);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 0 26px 0 10px;
-  cursor: pointer;
-}
-
-/* The browser rings the select itself — a square blue box drawn inside a
-   rounded dark pill. The pill takes the focus instead, in its own colour and
-   its own shape, so the whole control lights up. Inset, so it reads as part
-   of the pill rather than a halo around it.
-
-   A select counts as focused-visible the moment it is clicked, not only when
-   it is tabbed to, so this shows on a click as well. That is the browser's
-   call and not ours to undo — which is the reason for making it look like
-   something we meant. */
-.run:has(.run__select:focus-visible) {
-  outline: 2px solid var(--fv-accent);
-  outline-offset: -2px;
-}
-
-.run__select:focus,
-.run__select:focus-visible {
-  outline: none;
+.run--choosable .run__value {
+  padding-right: 4px;
 }
 
 .run__chevron {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
+  align-self: center;
+  flex: 0 0 auto;
+  margin-right: 8px;
   color: var(--fv-muted);
-  /* The select is underneath and must take the click. */
-  pointer-events: none;
+  transition: transform 150ms ease;
+}
+
+.run__chevron--open {
+  transform: rotate(180deg);
+}
+
+/* The model picker's panel, opening upward from the pill. */
+.runpick__list {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 6;
+  min-width: 100%;
+  max-height: 40vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--fv-panel-solid);
+  border: 1px solid var(--fv-border);
+  border-radius: var(--fv-radius);
+  box-shadow: var(--fv-shadow);
+  font-variant-numeric: tabular-nums;
+}
+
+.runpick__list:focus {
+  outline: none;
+}
+
+.runpick__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.runpick__option--active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.runpick__option--selected {
+  background: rgba(47, 182, 201, 0.22);
+}
+
+/* Keyboard focus on the selected row still has to show. */
+.runpick__list:focus-visible .runpick__option--active {
+  box-shadow: inset 0 0 0 1px var(--fv-accent);
+}
+
+.runpick__tag {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fv-muted);
 }
 
 /* ---- the time control ---- */
@@ -635,14 +1014,47 @@ button {
   color: var(--fv-muted);
 }
 
-.strip__playhead {
+/* The panel's inside, rounded as it is, so the track clips to its corners
+   (the panel itself cannot clip: the label stands outside it). The track is
+   the top 3px of it, right under the label's arrow, and the fill runs along
+   it to the playhead. */
+.strip__progress {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--fv-accent);
+  inset: 0;
+  border-radius: 11px;
+  overflow: hidden;
   pointer-events: none;
+}
+
+.strip__progress::before,
+.strip__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+}
+
+.strip__progress::before {
+  content: "";
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.strip__fill {
+  background: var(--fv-accent);
+  transition: width 200ms ease;
+}
+
+/* In the hand, the fill keeps up with it exactly. */
+.strip__fill--held {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip__fill,
+  .run__chevron {
+    transition: none;
+  }
 }
 
 /* The playhead's handle. `left` is set in pixels from `tooltipAnchor`, which
@@ -686,7 +1098,8 @@ button {
   .rail {
     max-height: 40vh;
   }
-  /* Too narrow for three pills in a row, so the legend goes back on top. */
+  /* Too narrow for the days and the corner column in a row, so the column
+     goes on top. */
   .bottom {
     flex-direction: column;
     align-items: flex-end;
@@ -695,7 +1108,7 @@ button {
   .bottom > .strip {
     align-self: stretch;
   }
-  .legend {
+  .corner {
     order: -1;
   }
   /* The legend is now directly above the days, where the handle used to

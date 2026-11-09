@@ -13,6 +13,7 @@ import { loadCatalogue, loadEdr, loadRuns } from "../api/client";
 import type { Catalogue, EdrCollection, EdrParameter, Source } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
 import { buildTimeline, stepIndex, type Timeline } from "./timeline";
+import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
 
 export type Status = "loading" | "ready" | "empty" | "error";
 
@@ -30,8 +31,11 @@ interface State {
   edr: EdrCollection | null;
   step: number;
   playing: boolean;
-  /** The wind toggle; drawn only when the selected source has a wind binding. */
-  windOn: boolean;
+  /**
+   * How the wind is drawn, from the toolbar's dropup and remembered between
+   * visits. `on` is drawn only when the selected source has a wind binding.
+   */
+  wind: WindSettings;
 }
 
 const state = reactive<State>({
@@ -45,8 +49,13 @@ const state = reactive<State>({
   edr: null,
   step: 0,
   playing: false,
-  windOn: true,
+  wind: loadWindSettings(),
 });
+
+watch(
+  () => ({ ...state.wind }),
+  (settings) => saveWindSettings(settings),
+);
 
 /** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
 const keyOf = (source: Source) => `${source.catalog}/${source.collection}`;
@@ -81,7 +90,7 @@ const windBinding = computed<Source | null>(() => {
 });
 
 /** The wind binding the map should draw: the toggle is on and the source has one. Null otherwise. */
-const windToDraw = computed<Source | null>(() => (state.windOn ? windBinding.value : null));
+const windToDraw = computed<Source | null>(() => (state.wind.on ? windBinding.value : null));
 
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
@@ -177,8 +186,13 @@ function pickSource(slug: string) {
   if (scalarView.value && state.selection) state.selection = selectSource(scalarView.value, state.selection, slug);
 }
 
-function setWind(on: boolean) {
-  state.windOn = on;
+/** Changes some of the wind settings; the caller is the dropup, whose controls keep each in range. */
+function setWind(changes: Partial<WindSettings>) {
+  Object.assign(state.wind, changes);
+}
+
+function resetWind() {
+  state.wind = { ...DEFAULT_WIND };
 }
 
 function pickRun(referenceTime: string) {
@@ -224,5 +238,6 @@ export function useViewer() {
     setStep,
     setPlaying,
     setWind,
+    resetWind,
   };
 }
