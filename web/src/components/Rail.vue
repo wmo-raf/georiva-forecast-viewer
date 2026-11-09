@@ -8,6 +8,9 @@
  * the only thing that opens or closes it: picking a quantity, Escape and the
  * map all leave it as it is. It starts open on a wide viewport
  * and closed on a narrow one, decided once at load and never stored.
+ *
+ * Until the catalogue lands the pill and the list are skeletons: the frame is
+ * up from the first paint, and they fill in where they stand.
  */
 import { ChevronDown } from "lucide-vue-next";
 import { computed, ref } from "vue";
@@ -34,14 +37,17 @@ const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).m
       :title="open ? 'Hide layers' : 'Show layers'"
       @click="open = !open"
     >
-      <component
-        :is="iconFor(selectedQuantity?.icon ?? '')"
-        class="layers__icon"
-        :size="16"
-        :stroke-width="1.75"
-        aria-hidden="true"
-      />
-      <span class="layers__name">{{ selectedQuantity?.name }}</span>
+      <template v-if="selectedQuantity">
+        <component
+          :is="iconFor(selectedQuantity.icon)"
+          class="layers__icon"
+          :size="16"
+          :stroke-width="1.75"
+          aria-hidden="true"
+        />
+        <span class="layers__name">{{ selectedQuantity.name }}</span>
+      </template>
+      <span v-else class="skel skel--line layers__skel" aria-label="Loading layers"></span>
       <ChevronDown
         class="layers__chevron"
         :class="{ 'layers__chevron--open': open }"
@@ -52,7 +58,13 @@ const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).m
     </button>
     <Transition name="rail">
       <aside v-show="open" id="layers-menu" class="rail">
-        <div class="rail__list" role="radiogroup" aria-label="Quantity">
+        <div v-if="!viewer.state.catalogue" class="rail__list" aria-hidden="true">
+          <div v-for="n in 4" :key="n" class="rail__item rail__item--skel">
+            <span class="skel skel--dot"></span>
+            <span class="skel skel--line" :style="{ width: `${[96, 72, 110, 84][n - 1]}px` }"></span>
+          </div>
+        </div>
+        <div v-else class="rail__list" role="radiogroup" aria-label="Quantity">
           <button
             v-for="q in viewer.scalarQuantities.value"
             :key="q.slug"

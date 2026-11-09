@@ -34,9 +34,11 @@ onMounted(viewer.load);
       @raster-error="rasterError = $event"
       @wind-error="windError = $event"
     />
-    <div v-if="viewer.state.status === 'loading'" class="notice">Loading…</div>
-    <div v-else-if="viewer.state.status === 'error'" class="notice notice--error">{{ viewer.state.error }}</div>
+    <div v-if="viewer.state.status === 'error'" class="notice notice--error">{{ viewer.state.error }}</div>
     <div v-else-if="viewer.state.status === 'empty'" class="notice">Nothing is configured for this viewer yet.</div>
+    <!-- The frame is up from the first paint, loading or not: every piece
+         holds its final size, as a skeleton until its data lands, so the page
+         fills in place rather than shifting as answers arrive. -->
     <template v-else>
       <Rail />
       <div v-if="warnings.length" class="notice notice--error notice--floating">
