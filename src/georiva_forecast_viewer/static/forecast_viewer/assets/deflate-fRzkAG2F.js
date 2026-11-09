@@ -1,0 +1,1 @@
+import{t as e}from"./pako.esm-FY_AaR6l.js";import{BaseDecoder as t}from"./geotiff-CAHmXui0.js";var n=class extends t{decodeBlock(t){return e(new Uint8Array(t)).buffer}};export{n as default};
