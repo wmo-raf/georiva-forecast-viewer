@@ -5,6 +5,7 @@ import Legend from "./components/Legend.vue";
 import MapView from "./components/MapView.vue";
 import ModelPanel from "./components/ModelPanel.vue";
 import Rail from "./components/Rail.vue";
+import Toolbar from "./components/Toolbar.vue";
 import { useViewer } from "./state/store";
 
 const viewer = useViewer();
@@ -69,6 +70,7 @@ onMounted(viewer.load);
         <p v-for="message in warnings" :key="message">{{ message }}</p>
       </div>
       <ModelPanel />
+      <Toolbar />
       <!-- One row: the time control takes what is left of the width, the
            legend closes it on the right. On a narrow viewport the legend
            moves back above the row; `style.css` does that with `order`. -->

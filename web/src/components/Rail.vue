@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * The left rail: the quantities a user can show, and the wind toggle.
- * The map draws a fixed pair, the selected scalar quantity plus wind, so the
- * list is scalar quantities only and wind is a switch beside it.
+ * The left rail: the quantities a user can show. The map draws a fixed pair,
+ * the selected scalar quantity plus wind, so the list is scalar quantities
+ * only; wind is the toolbar's, which owns its switch and its settings.
  *
  * It collapses behind a pill that names the quantity on the map. The pill is
- * the only thing that opens or closes it: picking a quantity, the wind switch,
- * Escape and the map all leave it as it is. It starts open on a wide viewport
+ * the only thing that opens or closes it: picking a quantity, Escape and the
+ * map all leave it as it is. It starts open on a wide viewport
  * and closed on a narrow one, decided once at load and never stored.
  */
-import { ChevronDown, Wind } from "lucide-vue-next";
+import { ChevronDown } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useViewer } from "../state/store";
 import { iconFor } from "../ui/icons";
@@ -20,7 +20,6 @@ const NARROW = "(max-width: 720px)";
 const viewer = useViewer();
 const selected = computed(() => viewer.state.selection?.quantity ?? null);
 const selectedQuantity = computed(() => viewer.scalarQuantities.value.find((q) => q.slug === selected.value) ?? null);
-const windAvailable = computed(() => viewer.windBinding.value !== null);
 
 const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).matches);
 </script>
@@ -68,18 +67,6 @@ const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).m
             <span class="rail__label" :title="q.name">{{ q.name }}</span>
           </button>
         </div>
-        <label class="rail__wind" :class="{ 'rail__wind--off': !windAvailable }">
-          <Wind class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
-          <span class="rail__label">Wind</span>
-          <input
-            type="checkbox"
-            class="rail__switch"
-            :checked="viewer.state.windOn && windAvailable"
-            :disabled="!windAvailable"
-            :title="windAvailable ? 'Wind particles' : 'This model has no wind binding'"
-            @change="viewer.setWind(($event.target as HTMLInputElement).checked)"
-          />
-        </label>
       </aside>
     </Transition>
   </div>

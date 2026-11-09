@@ -38,6 +38,7 @@ import type { ViewerConfig } from "../api/types";
 import { DATA_ANCHOR_ID, greyBasemap } from "../map/basemap";
 import { particleCount, type Bounds } from "../map/particles";
 import { loadTexture, type Texture } from "../map/texture";
+import { attachMap } from "../map/zoom";
 import { useViewer } from "../state/store";
 
 setWorkerUrl(workerUrl);
@@ -46,16 +47,14 @@ const LAYER_ID = "forecast-raster";
 const WIND_LAYER_ID = "forecast-wind";
 
 /**
- * How the trails look: white over the raster, long enough to read a direction
- * at a glance without hiding the colours underneath. `speedFactor` is applied
- * relative to the zoom, so one value reads the same whether the view is a
- * continent or a country. Tuned by eye against both models.
+ * How the trails look where the user has no say: white over the raster, so a
+ * direction reads at a glance without hiding the colours underneath. Speed,
+ * width, life and density are the user's, from the toolbar's wind dropup
+ * (`state/windSettings.ts`); `speedFactor` is applied relative to the zoom, so
+ * one value reads the same whether the view is a continent or a country.
  */
 const WIND = {
   color: [255, 255, 255, 230] as [number, number, number, number],
-  width: 1.4,
-  maxAge: 25,
-  speedFactor: 25,
   opacity: 0.85,
 };
 
@@ -91,6 +90,7 @@ const wind = newSlot();
 function windLayers() {
   const current = wind.texture.value;
   if (!current) return [];
+  const settings = viewer.state.wind;
   return [
     new ParticleLayer({
       id: WIND_LAYER_ID,
@@ -103,10 +103,10 @@ function windLayers() {
       // One range for both bands, as the pair was encoded over (core's #593):
       // R unscales to u and G to v, so the integrated direction is the source's.
       imageUnscale: current.unscale,
-      numParticles: particleCount(current.bounds, viewport.value),
-      maxAge: WIND.maxAge,
-      speedFactor: WIND.speedFactor,
-      width: WIND.width,
+      numParticles: particleCount(current.bounds, viewport.value, settings.density),
+      maxAge: settings.life,
+      speedFactor: settings.speed,
+      width: settings.width,
       color: WIND.color,
       opacity: WIND.opacity,
       animate: true,
@@ -183,6 +183,11 @@ watch(raster.error, (message) => emit("rasterError", message), { immediate: true
 watch(wind.error, (message) => emit("windError", message), { immediate: true });
 
 watch(() => viewer.parameter.value, repaint);
+// `on` reaches the map through the wind texture's URL; the rest only restyle it.
+watch(
+  () => [viewer.state.wind.speed, viewer.state.wind.width, viewer.state.wind.life, viewer.state.wind.density],
+  repaint,
+);
 
 function readViewport() {
   if (!map) return;
@@ -201,7 +206,9 @@ onMounted(() => {
     zoom: props.config.default_view.zoom,
     attributionControl: { compact: true },
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  // No NavigationControl: zoom lives in the toolbar, which drives this map
+  // through `map/zoom.ts`.
+  attachMap(map);
   // On `moveend`, not `move`: the budget only moves in powers of two, and
   // resizing it mid-gesture would restart every trail (see `map/particles.ts`).
   map.on("moveend", () => {
@@ -216,6 +223,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  attachMap(null);
   map?.remove();
   map = null;
   overlay = null;
