@@ -9,17 +9,11 @@
   --fv-error: #ff8a80;
   --fv-radius: 12px;
   --fv-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  /* The bottom bar's geometry, named once. Anything that has to stand clear of
-     the bar reads these rather than restating a number that then goes stale
-     the next time the bar changes height. `--fv-bar-h` is one pill's height;
-     `--fv-bar-total` the whole bar's, which is the same until it wraps onto
-     two rows on a narrow viewport. */
+  /* One pill's height in the bottom bar, named once. */
   --fv-bar-h: 32px;
-  /* The bar's measured height, written by `App.vue` from the footer itself:
-     it wraps onto two and three rows as the width allows, and nothing in CSS
-     can see which. Anything standing clear of the bar reads this. The value
-     here is the one-row case, used until the first measurement lands. */
-  --fv-bar-total: var(--fv-bar-h);
+  /* The bottom-right column — model picker, toolbar, legend — at one width,
+     which is the legend's: wide enough for its labels (`ui/legend.ts`). */
+  --fv-corner-w: 360px;
   /* The narrowest the days are worth drawing: below this the run pill gives
      up its place on the line. Three cells of a two-digit date need about
      170px, so this leaves room to spare at the moment it wraps. */
@@ -29,8 +23,6 @@
      taller, so standing above this band clears the credit either way. */
   --fv-attrib-h: 34px;
   --fv-bar-bottom: calc(var(--fv-attrib-h) + 10px);
-  /* The toolbar, just above the bar; the model selector stands on it. */
-  --fv-tools-bottom: calc(var(--fv-bar-bottom) + var(--fv-bar-total) + 10px);
   font-family:
     system-ui,
     -apple-system,
@@ -250,18 +242,14 @@ button {
 
 /* ---- model panel ---- */
 
-/* Stands on the toolbar, which stands clear of the bottom bar whatever height
-   the bar is. The toolbar is one pill high, so this is the toolbar's own
-   offset plus that pill and the gap above it. */
+/* The top of the corner column, at its width. The options open upward, and
+   the column is anchored at the bottom, so they grow it upward and nothing
+   below them moves. */
 .model {
-  position: absolute;
-  right: 16px;
-  bottom: calc(var(--fv-tools-bottom) + var(--fv-bar-h) + 8px);
-  z-index: 4;
   display: flex;
   /* The toggle comes first in the DOM, so Tab reaches it before the options it opens; drawn above them. */
   flex-direction: column-reverse;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -317,7 +305,6 @@ button {
   border-radius: var(--fv-radius);
   box-shadow: var(--fv-shadow);
   padding: 8px;
-  min-width: 240px;
 }
 
 .model__heading {
@@ -351,22 +338,18 @@ button {
 
 /* ---- toolbar ---- */
 
-/* The bar, and the wind dropup that opens above it, right-aligned. */
+/* The middle of the corner column. The wind dropup floats above it rather than
+   in the column's flow, so opening it moves nothing — it covers the model
+   picker while it is open. */
 .tools {
-  position: absolute;
-  right: 16px;
-  bottom: var(--fv-tools-bottom);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  position: relative;
 }
 
 .tools__bar {
   display: flex;
   align-items: stretch;
   height: var(--fv-bar-h);
+  overflow: hidden;
   box-sizing: border-box;
   padding: 0 2px;
   background: var(--fv-panel);
@@ -381,7 +364,8 @@ button {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 30px;
+  /* Equal shares of the column's width: one segmented control, every pixel a target. */
+  flex: 1 1 0;
   padding: 0 6px;
   border: 0;
   background: transparent;
@@ -424,7 +408,11 @@ button {
 /* ---- wind dropup ---- */
 
 .wind {
-  width: 240px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 1;
   box-sizing: border-box;
   background: var(--fv-panel-solid);
   border: 1px solid var(--fv-border);
@@ -448,11 +436,44 @@ button {
   font-size: 14px;
 }
 
+/* A track and a knob, drawn on the checkbox itself so keyboard and screen
+   readers keep the native control (`role="switch"` names it). */
 .wind__switch {
-  accent-color: var(--fv-accent);
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
   width: 34px;
   height: 18px;
   margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.wind__switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fv-fg);
+  transition: transform 150ms ease;
+}
+
+.wind__switch:checked {
+  background: var(--fv-accent);
+}
+
+.wind__switch:checked::before {
+  transform: translateX(16px);
+}
+
+.wind__switch:focus-visible {
+  outline: 2px solid var(--fv-accent);
+  outline-offset: 2px;
 }
 
 .wind__settings {
@@ -544,7 +565,9 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tools__caret {
+  .tools__caret,
+  .wind__switch,
+  .wind__switch::before {
     transition: none;
   }
 }
@@ -560,8 +583,8 @@ button {
   height: 22px;
   /* Fixed, so the pill's edge never moves with the palette or the variable;
      everything inside divides what is there. It gives way only to a viewport
-     too narrow to hold it, where `100%` is the footer's own width. */
-  width: 360px;
+     too narrow to hold it, where `100%` is the corner column's width. */
+  width: var(--fv-corner-w);
   max-width: 100%;
   /* So the border is inside the fixed width, and inside the fallback too. */
   box-sizing: border-box;
@@ -665,11 +688,25 @@ button {
   display: flex;
   align-items: flex-end;
   gap: 10px;
+  /* The corner column makes the bar tall; the empty space beside it, above
+     the days, belongs to the map. */
+  pointer-events: none;
 }
 
-/* Its width is its own; the time control takes the rest. */
-.bottom > .legend {
+.bottom > * {
+  pointer-events: auto;
+}
+
+/* The bottom-right column: model picker, toolbar and legend at one width, on
+   the bar's baseline. Its width is its own; the time control takes the rest. */
+.corner {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: var(--fv-corner-w);
+  max-width: 100%;
 }
 
 /* Layout only — no background, no border, no padding. The chrome belongs to
@@ -951,7 +988,8 @@ button {
   .rail {
     max-height: 40vh;
   }
-  /* Too narrow for three pills in a row, so the legend goes back on top. */
+  /* Too narrow for the days and the corner column in a row, so the column
+     goes on top. */
   .bottom {
     flex-direction: column;
     align-items: flex-end;
@@ -960,7 +998,7 @@ button {
   .bottom > .strip {
     align-self: stretch;
   }
-  .legend {
+  .corner {
     order: -1;
   }
   /* The legend is now directly above the days, where the handle used to

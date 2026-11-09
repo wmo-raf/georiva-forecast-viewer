@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * The map toolbar, bottom right between the bar and the model selector: zoom,
- * wind and full screen, in one row.
+ * The map toolbar, in the corner column between the model picker and the
+ * legend: zoom in, zoom out, wind and full screen, in one row at the column's
+ * width, each button an equal share of it.
  *
  * Wind is the toolbar's alone — the rail lists scalar quantities only. Its
  * button says whether wind is drawn (accent when on, muted when off) and opens
@@ -90,6 +91,7 @@ onBeforeUnmount(() => {
         <span class="wind__title">Wind</span>
         <input
           type="checkbox"
+          role="switch"
           class="wind__switch"
           :checked="settings.on"
           @change="viewer.setWind({ on: ($event.target as HTMLInputElement).checked })"
@@ -166,22 +168,22 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="tools__button"
-        title="Zoom out"
-        aria-label="Zoom out"
-        :disabled="!zoom.canZoomOut.value"
-        @click="zoom.zoomOut()"
-      >
-        <Minus :size="16" :stroke-width="2" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="tools__button"
         title="Zoom in"
         aria-label="Zoom in"
         :disabled="!zoom.canZoomIn.value"
         @click="zoom.zoomIn()"
       >
         <Plus :size="16" :stroke-width="2" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="tools__button"
+        title="Zoom out"
+        aria-label="Zoom out"
+        :disabled="!zoom.canZoomOut.value"
+        @click="zoom.zoomOut()"
+      >
+        <Minus :size="16" :stroke-width="2" aria-hidden="true" />
       </button>
       <button
         type="button"
