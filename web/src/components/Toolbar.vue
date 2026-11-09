@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * The map toolbar, in the corner column between the model picker and the
- * legend: zoom in, zoom out, wind and full screen, in one row at the column's
- * width, each button an equal share of it.
+ * legend: zoom in, zoom out, wind and full screen, in one row at its own
+ * width, right-aligned: a fixed step per tool, up to the column's width.
  *
  * Wind is the toolbar's alone — the rail lists scalar quantities only. Its
  * button says whether wind is drawn (accent when on, muted when off) and opens

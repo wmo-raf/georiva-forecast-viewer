@@ -11,7 +11,7 @@
   --fv-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
   /* One pill's height in the bottom bar, named once. */
   --fv-bar-h: 32px;
-  /* The bottom-right column — model picker, toolbar, legend — at one width,
+  /* The bottom-right column — model picker, toolbar, legend — is this wide,
      which is the legend's: wide enough for its labels (`ui/legend.ts`). */
   --fv-corner-w: 360px;
   /* The narrowest the days are worth drawing: below this the run pill gives
@@ -242,14 +242,14 @@ button {
 
 /* ---- model panel ---- */
 
-/* The top of the corner column, at its width. The options open upward, and
+/* The top of the corner column, at its own width. The options open upward, and
    the column is anchored at the bottom, so they grow it upward and nothing
    below them moves. */
 .model {
   display: flex;
   /* The toggle comes first in the DOM, so Tab reaches it before the options it opens; drawn above them. */
   flex-direction: column-reverse;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 8px;
 }
 
@@ -305,6 +305,7 @@ button {
   border-radius: var(--fv-radius);
   box-shadow: var(--fv-shadow);
   padding: 8px;
+  min-width: 240px;
 }
 
 .model__heading {
@@ -343,6 +344,9 @@ button {
    picker while it is open. */
 .tools {
   position: relative;
+  /* It grows a button at a time as tools are added. Past this it clips —
+     deliberately: what a toolbar that full should do is decided then. */
+  max-width: var(--fv-corner-w);
 }
 
 .tools__bar {
@@ -364,9 +368,10 @@ button {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  /* Equal shares of the column's width: one segmented control, every pixel a target. */
-  flex: 1 1 0;
-  padding: 0 6px;
+  /* A fixed step per tool, so the bar's width is the count of its tools. */
+  flex: 0 0 auto;
+  min-width: 36px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--fv-fg);
@@ -389,6 +394,8 @@ button {
 }
 
 .tools__button--wind {
+  /* Icon and caret: as wide as the pair needs. */
+  padding: 0 8px;
   color: var(--fv-muted);
 }
 
@@ -409,8 +416,10 @@ button {
 
 .wind {
   position: absolute;
-  left: 0;
+  /* Wider than the toolbar, so it hangs off the toolbar's right edge. */
   right: 0;
+  width: 260px;
+  max-width: calc(100vw - 32px);
   bottom: calc(100% + 8px);
   z-index: 1;
   box-sizing: border-box;
@@ -697,16 +706,24 @@ button {
   pointer-events: auto;
 }
 
-/* The bottom-right column: model picker, toolbar and legend at one width, on
-   the bar's baseline. Its width is its own; the time control takes the rest. */
+/* The bottom-right column: model picker, toolbar and legend on the bar's
+   baseline. The column is the legend's width; the picker and toolbar keep
+   their own, right-aligned, so neither is stretched to it. The time control
+   takes the rest of the row. */
 .corner {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 8px;
   width: var(--fv-corner-w);
   max-width: 100%;
+  /* Beside the narrower picker and toolbar, the column is empty: the map's. */
+  pointer-events: none;
+}
+
+.corner > * {
+  pointer-events: auto;
 }
 
 /* Layout only — no background, no border, no padding. The chrome belongs to

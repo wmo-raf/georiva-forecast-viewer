@@ -44,7 +44,7 @@ onMounted(viewer.load);
       </div>
       <!-- One row: the time control takes what is left of the width, and the
            corner column closes it on the right — the model picker, the
-           toolbar and the legend, stacked on the bar's baseline at one width.
+           toolbar and the legend, stacked right-aligned on the bar's baseline.
            On a narrow viewport the column moves above the row; `style.css`
            does that with `order`. -->
       <footer class="bottom">
