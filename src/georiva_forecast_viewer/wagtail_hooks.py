@@ -49,6 +49,7 @@ class QuantityViewSet(OrgScopedViewSetMixin, SnippetViewSet):
         # A dropdown over the curated set; the list is the widget's, not the
         # field's, so a new glyph in icons.json needs no migration.
         FieldPanel("icon", widget=forms.Select(choices=ICON_CHOICES)),
+        FieldPanel("decimals"),
         FieldPanel("order"),
     ]
 

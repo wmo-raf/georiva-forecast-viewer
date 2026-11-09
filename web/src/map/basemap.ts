@@ -52,6 +52,14 @@ import type { ExpressionSpecification, LayerSpecification, StyleSpecification } 
 /** The layer the viewer's own layers insert before. Core's name, core's role. */
 export const DATA_ANCHOR_ID = "georiva-data-anchor";
 
+/**
+ * The cities and towns, with their values: a GeoJSON source the viewer fills
+ * (`map/places.ts`) from this style's own `place` features. Declared empty, so
+ * the style is whole before the first frame and the names appear as soon as
+ * the viewer has read them.
+ */
+export const PLACES_SOURCE_ID = "places";
+
 const OPENFREEMAP = "https://tiles.openfreemap.org";
 
 /**
@@ -154,10 +162,11 @@ const SHADOW_OPACITY = 0.6;
  *
  * So the halo carries the label and the fill is the constant, which is the
  * reverse of what it used to be. It is opaque, because a see-through outline
- * muddies against a mid-tone and fails exactly where it is needed, and 1.2 px,
- * which closes cleanly around text from 10 to 19 px — MapLibre builds halos
- * from the glyph SDF and they stop growing well past about a quarter of the
- * font size.
+ * muddies against a mid-tone and fails exactly where it is needed, and 0.8 px.
+ * That is down from 1.2, which read heavy once every city and town carried a
+ * value under its name and the map held twice the outlined text; 0.8 was
+ * compared against 1.0 and 1.2 over temperature and over near-white dry
+ * precipitation, and it still closes around the smallest town labels.
  *
  * The black ring is also what keeps a name off the wind: the particles are
  * white too (`WIND.color` in `MapView.vue`), and without an outline a trail
@@ -165,13 +174,28 @@ const SHADOW_OPACITY = 0.6;
  */
 const TEXT = "#ffffff";
 const HALO = "#000000";
-const HALO_WIDTH = 1.2;
+const HALO_WIDTH = 0.8;
 
 const REGULAR = ["Noto Sans Regular"];
 const ITALIC = ["Noto Sans Italic"];
 
 /** The English name where there is one, the local name otherwise. */
 const NAME: ExpressionSpecification = ["to-string", ["coalesce", ["get", "name_en"], ["get", "name"]]];
+
+/**
+ * A city or town's name, with the forecast under it when there is one.
+ *
+ * The value arrives already formatted (`places.ts`), so this only stacks it:
+ * the same font, size, colour and halo as the name, because a second line is
+ * all it needs to read as the place's value. A place with nothing under it has
+ * no `value` property and keeps its name alone.
+ */
+const NAME_AND_VALUE: ExpressionSpecification = [
+  "case",
+  ["has", "value"],
+  ["concat", NAME, "\n", ["get", "value"]],
+  NAME,
+];
 
 type Stop = [zoom: number, value: number];
 
@@ -409,6 +433,20 @@ const boundaries: LayerSpecification[] = [
  * at a hemisphere of forecast a scatter of city names is clutter, and they
  * arrive at z5, where a user has zoomed to a country and wants to find a place
  * in it.
+ *
+ * Cities and towns are read from `PLACES_SOURCE_ID` rather than from the tiles,
+ * because they carry the selected quantity's value on a second line and a
+ * label can only show what its own feature carries. The features are still
+ * OpenMapTiles' — `map/places.ts` copies them with their name, class and rank —
+ * so the filters, zoom windows and rank order below are unchanged. Countries
+ * and islands name areas rather than points, carry no value, and stay on the
+ * tiles.
+ *
+ * Their type is a pixel larger than it was before they carried values, at every
+ * stop: a name and a number are read rather than glanced at, and the thinner
+ * halo (`HALO_WIDTH`) left them looking small. Measured at z6–z7 over East
+ * Africa, the larger boxes cost one or two of the lowest-ranked names in forty
+ * to eighty to collisions.
  */
 const placeLabels: LayerSpecification[] = [
   {
@@ -489,19 +527,18 @@ const placeLabels: LayerSpecification[] = [
   {
     id: "city-lg",
     type: "symbol",
-    source: "openmaptiles",
-    "source-layer": "place",
+    source: PLACES_SOURCE_ID,
     minzoom: 5,
     maxzoom: 14,
     filter: places(["city"], [null, 2]),
     layout: {
       "text-font": REGULAR,
-      "text-field": NAME,
+      "text-field": NAME_AND_VALUE,
       "text-max-width": 7,
       "text-size": byZoom(
         [
-          [5, 10],
-          [12, 16],
+          [5, 11],
+          [12, 17],
         ],
         0.9,
       ),
@@ -512,19 +549,18 @@ const placeLabels: LayerSpecification[] = [
   {
     id: "city-md",
     type: "symbol",
-    source: "openmaptiles",
-    "source-layer": "place",
+    source: PLACES_SOURCE_ID,
     minzoom: 5,
     maxzoom: 14,
     filter: places(["city"], [3, 4]),
     layout: {
       "text-font": REGULAR,
-      "text-field": NAME,
+      "text-field": NAME_AND_VALUE,
       "text-max-width": 7,
       "text-size": byZoom(
         [
-          [5, 9.5],
-          [12, 15],
+          [5, 10.5],
+          [12, 16],
         ],
         0.9,
       ),
@@ -535,19 +571,18 @@ const placeLabels: LayerSpecification[] = [
   {
     id: "city-sm",
     type: "symbol",
-    source: "openmaptiles",
-    "source-layer": "place",
+    source: PLACES_SOURCE_ID,
     minzoom: 6,
     maxzoom: 14,
     filter: places(["city"], [5, null]),
     layout: {
       "text-font": REGULAR,
-      "text-field": NAME,
+      "text-field": NAME_AND_VALUE,
       "text-max-width": 7,
       "text-size": byZoom(
         [
-          [7, 9.5],
-          [12, 14.5],
+          [7, 10.5],
+          [12, 15.5],
         ],
         0.9,
       ),
@@ -560,18 +595,17 @@ const placeLabels: LayerSpecification[] = [
     // longer enough to say where you are.
     id: "town",
     type: "symbol",
-    source: "openmaptiles",
-    "source-layer": "place",
+    source: PLACES_SOURCE_ID,
     minzoom: 7,
     maxzoom: 15,
     filter: places(["town"], [null, null]),
     layout: {
       "text-font": REGULAR,
-      "text-field": NAME,
+      "text-field": NAME_AND_VALUE,
       "text-max-width": 7,
       "text-size": byZoom([
-        [7, 9],
-        [15, 13.5],
+        [7, 10],
+        [15, 14.5],
       ]),
       ...BY_RANK,
     },
@@ -673,6 +707,7 @@ export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } =
     name: "GeoRiva forecast viewer basemap",
     sources: {
       openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
+      [PLACES_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
       ...(shoreShadow
         ? {
             "shore-shadow": {

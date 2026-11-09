@@ -103,7 +103,14 @@ def describe_quantities(request):
         quantity = binding.quantity
         entry = by_quantity.setdefault(
             quantity.pk,
-            {"slug": quantity.slug, "name": quantity.name, "kind": quantity.kind, "icon": quantity.icon, "sources": []},
+            {
+                "slug": quantity.slug,
+                "name": quantity.name,
+                "kind": quantity.kind,
+                "icon": quantity.icon,
+                "decimals": quantity.decimals,
+                "sources": [],
+            },
         )
         entry["sources"].append(describe_source(binding))
     return list(by_quantity.values())
