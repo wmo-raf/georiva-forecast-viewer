@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * The timeline: one cell per day of the run, a playhead that sits inside the
- * cell at the step's hour, a floating label with the exact step, and play.
+ * The timeline: one cell per day of the run, a progress fill along the bottom
+ * that reaches the step's hour inside its cell, a floating label with the
+ * exact step, and play.
  *
  * Two floating pills, laid out by `.strip`, which carries no chrome of its
  * own: the controls on the left and the days beside them, so the row sits at
@@ -213,7 +214,16 @@ onBeforeUnmount(() => {
           <span class="strip__daynum">{{ cell.day }}</span>
           <span class="strip__weekday">{{ cell.weekday }}</span>
         </button>
-        <div class="strip__playhead" :style="{ left: `${playhead * 100}%` }"></div>
+        <!-- Progress, as a video player draws it: a thin track along the
+             bottom, filled up to the playhead. The fill's end is the
+             position; the label above points at it and is the handle. -->
+        <div class="strip__progress" aria-hidden="true">
+          <div
+            class="strip__fill"
+            :class="{ 'strip__fill--held': dragging }"
+            :style="{ width: `${playhead * 100}%` }"
+          ></div>
+        </div>
       </div>
     </div>
   </div>
