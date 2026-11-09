@@ -1,0 +1,1 @@
+import{BaseDecoder as e}from"./geotiff-BIB-sT12.js";var t=class extends e{decodeBlock(e){return e}};export{t as default};
