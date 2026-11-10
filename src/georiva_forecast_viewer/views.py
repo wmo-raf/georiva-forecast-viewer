@@ -24,7 +24,7 @@ from georiva.core.models import Collection
 from georiva.organisations.access import require_active_org
 from georiva.organisations.ownership import scope_rows
 
-from .models import ForecastViewerSettings, QuantityBinding
+from .models import ForecastSource, ForecastViewerSettings, QuantityBinding
 from .pressure import describe_pressure
 from .pyramid import is_rendered, pyramid_in
 
@@ -62,6 +62,34 @@ def shore_shadow_available(settings):
     return is_rendered(pyramid_in(django_settings.STATIC_ROOT)) if django_settings.STATIC_ROOT else False
 
 
+def describe_weather(request, settings):
+    """The Weather layer: the operator's label and opening choice, and who can draw it.
+
+    The sources are those this caller may be served that name a symbols model,
+    in source order — the same visibility rule as the bindings, applied to the
+    sources directly, since a source draws Weather whatever quantities it binds.
+    """
+    sources = scope_rows(
+        request,
+        ForecastSource.objects.filter(collection__in=Collection.objects.visible_to(request)).exclude(symbols_model=""),
+    ).select_related("collection__catalog")
+    return {
+        "label": settings.weather_label,
+        "opens": settings.weather_opens,
+        "sources": [
+            {
+                "slug": source.slug,
+                "name": source.name,
+                "descriptor": source.descriptor,
+                "catalog": source.collection.catalog.slug,
+                "collection": source.collection.slug,
+                "symbols_model": source.symbols_model,
+            }
+            for source in sources.order_by("order", "name")
+        ],
+    }
+
+
 def visible_bindings(request):
     """This organisation's bindings on collections ``request`` may be served."""
     bindings = QuantityBinding.objects.filter(source__collection__in=Collection.objects.visible_to(request))
@@ -81,6 +109,7 @@ def describe_source(binding):
         "slug": source.slug,
         "name": source.name,
         "descriptor": source.descriptor,
+        "symbols_model": source.symbols_model,
         "catalog": source.collection.catalog.slug,
         "collection": source.collection.slug,
     }
@@ -161,7 +190,11 @@ class CatalogueView(APIView):
         # Read once: the config and the pressure overlays both come from it.
         settings = ForecastViewerSettings.for_site(organisation.site)
         response = Response(
-            {"config": describe_config(organisation, settings), "quantities": describe_quantities(request, settings)}
+            {
+                "config": describe_config(organisation, settings),
+                "quantities": describe_quantities(request, settings),
+                "weather": describe_weather(request, settings),
+            }
         )
         # Varies by audience at a URL that carries none (members see private
         # sources), so no cache between here and a browser may share it (ADR 0029).

@@ -4,6 +4,29 @@
 export interface Catalogue {
   config: ViewerConfig;
   quantities: Quantity[];
+  weather: WeatherLayer;
+}
+
+/**
+ * The Weather layer: Yr symbols over the towns and nothing else. Not a
+ * quantity — configured in the viewer's settings, and drawn by the sources
+ * that name a symbols model, listed here in source order.
+ */
+export interface WeatherLayer {
+  /** What the rail calls it: the operator's words, "Weather" by default. */
+  label: string;
+  /** Open the viewer on it, when any source can draw it. */
+  opens: boolean;
+  sources: WeatherSource[];
+}
+
+export interface WeatherSource {
+  slug: string;
+  name: string;
+  descriptor: string;
+  catalog: string;
+  collection: string;
+  symbols_model: string;
 }
 
 export interface ViewerConfig {
@@ -19,7 +42,8 @@ export interface ViewerConfig {
   shore_shadow: boolean;
 }
 
-export type QuantityKind = "scalar" | "vector";
+/** `weather` is the viewer's own rail entry (`state/weather.ts`), never one from the catalogue. */
+export type QuantityKind = "scalar" | "vector" | "weather";
 
 export interface Quantity {
   slug: string;
@@ -50,6 +74,13 @@ export interface Source {
    */
   version: string;
   pressure?: PressureOverlay;
+  /**
+   * The Forti forecast model whose town forecasts this source's weather
+   * symbols come from (`/api/forecast/{model}/places/`), or blank for none.
+   * The operator's choice: Forti does not say which collection a model is
+   * published from.
+   */
+  symbols_model: string;
 }
 
 /**
@@ -112,3 +143,38 @@ export interface EdrParameter {
 
 /** `[value, [r, g, b]]` or `[value, [r, g, b, a]]`, as WeatherLayers takes it. */
 export type PaletteStop = [number, [number, number, number] | [number, number, number, number]];
+
+/** One town of `GET /api/forecast/{model}/places/`, most prominent first. */
+export interface PlacesTown {
+  id: number;
+  name: string;
+  /** 1 capital, 2 admin-1 seat, 3 admin-2 seat, 4 town. */
+  rank: number;
+  population: number;
+  coordinates: [number, number];
+}
+
+/**
+ * `GET /api/forecast/{model}/places/`: a model's latest run told for its towns,
+ * every value as `values[field][town][time]` over `times`.
+ *
+ * Instants (`air_temperature`, `wind_*`) are read at a time; `symbol_code` and
+ * `precipitation_amount` cover the window that starts there.
+ */
+export interface PlacesMatrix {
+  model: string;
+  reference_time: string;
+  /** The area the towns were chosen from: west, south, east, north. */
+  bbox: [number, number, number, number];
+  window: { duration: string };
+  times: string[];
+  units: Record<string, string>;
+  towns: PlacesTown[];
+  values: {
+    symbol_code: (string | null)[][];
+    air_temperature: (number | null)[][];
+    wind_speed: (number | null)[][];
+    wind_from_direction: (number | null)[][];
+    precipitation_amount: (number | null)[][];
+  };
+}

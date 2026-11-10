@@ -47,7 +47,13 @@
  * lines say where a border is, and only the second is a claim. See
  * `SHADOW_OPACITY` for what drawing it over a palette costs.
  */
-import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LayerSpecification,
+  StyleSpecification,
+} from "maplibre-gl";
+import { ICON_PREFIX } from "./weatherIcons";
 
 /** The layer the viewer's own layers insert before. Core's name, core's role. */
 export const DATA_ANCHOR_ID = "georiva-data-anchor";
@@ -59,6 +65,24 @@ export const DATA_ANCHOR_ID = "georiva-data-anchor";
  * the viewer has read them.
  */
 export const PLACES_SOURCE_ID = "places";
+
+/**
+ * The towns with their weather symbols (`map/symbols.ts`), filled by
+ * `MapView.vue` from a Forti model's town forecasts. Declared empty, like the
+ * places, so the layer exists from the first frame and only its data changes.
+ */
+export const WEATHER_SYMBOLS_SOURCE_ID = "weather-symbols";
+export const WEATHER_SYMBOLS_LAYER_ID = "weather-symbols";
+
+/**
+ * NRK's icons are CC BY 4.0, so the credit is on the map whenever they are.
+ * On the source rather than in a fixed control: MapLibre credits only the
+ * sources a visible layer reads, and the symbols layer is visible only in
+ * Weather (`MapView.vue`).
+ */
+const WEATHER_SYMBOLS_CREDIT =
+  'Weather symbols © <a href="https://nrkno.github.io/yr-weather-symbols/" target="_blank" rel="noopener">Yr/NRK</a>, ' +
+  '<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>';
 
 const OPENFREEMAP = "https://tiles.openfreemap.org";
 
@@ -176,6 +200,86 @@ const TEXT = "#ffffff";
 const HALO = "#000000";
 const HALO_WIDTH = 0.8;
 
+/** The basemaps a user can pick: the same features, two palettes. */
+export type BasemapName = "grey" | "light";
+
+/**
+ * What a basemap is: colours, and the two things colour alone cannot say.
+ * Light fills the ocean — on grey the sea is the bare ground, told apart by the
+ * shore's shadow — and hides the shadow, which on pale water reads as a stain.
+ */
+interface Palette {
+  ground: string;
+  water: string;
+  waterFilter: FilterSpecification;
+  line: string;
+  /** Coastline, country, disputed and state borders. */
+  lineOpacity: [number, number, number, number];
+  text: string;
+  /** `undefined` is the style's default — 1 — so a switch back restores it exactly. */
+  textOpacity: number | undefined;
+  halo: string;
+  haloWidth: number;
+  warm: string;
+  cold: string;
+  shadow: boolean;
+}
+
+/** OpenMapTiles' lakes, above ground: the grey's only filled water. */
+const LAKES: FilterSpecification = ["all", ["==", ["get", "class"], "lake"], ["!=", ["get", "brunnel"], "tunnel"]];
+/** Every water polygon above ground, ocean included: core's light water. */
+const ALL_WATER: FilterSpecification = [
+  "all",
+  ["match", ["geometry-type"], ["MultiPolygon", "Polygon"], true, false],
+  ["!=", ["get", "brunnel"], "tunnel"],
+];
+
+const GREY: Palette = {
+  ground: GROUND,
+  water: INLAND_WATER,
+  waterFilter: LAKES,
+  line: LINE,
+  lineOpacity: [0.9, 0.9, 0.7, 0.45],
+  text: TEXT,
+  textOpacity: undefined,
+  halo: HALO,
+  haloWidth: HALO_WIDTH,
+  // Yr's red and blue, lightened to read on the dark ground.
+  warm: "#ff8a80",
+  cold: "#82b1ff",
+  shadow: true,
+};
+
+/**
+ * Core's light variant (`config/static/basemap/georiva-basemap.json`'s
+ * `light-*` layers), its colours and nothing more. Kept in step by hand; the
+ * features stay this style's own.
+ */
+const LIGHT: Palette = {
+  ground: "rgb(242,243,240)",
+  water: "rgb(194,200,202)",
+  waterFilter: ALL_WATER,
+  line: "hsl(0,0%,20%)",
+  lineOpacity: [0.55, 0.6, 0.5, 0.45],
+  text: "hsl(0,0%,0%)",
+  textOpacity: 0.7,
+  halo: "#ffffff",
+  haloWidth: 1.25,
+  // Yr's own, on its own pale ground.
+  warm: "#c60000",
+  cold: "#0062bf",
+  shadow: false,
+};
+
+const PALETTES: Record<BasemapName, Palette> = { grey: GREY, light: LIGHT };
+
+/** For the control: each basemap's name, and its land and water for a swatch. */
+export const BASEMAPS: { name: BasemapName; label: string; land: string; water: string }[] = [
+  { name: "grey", label: "Grey", land: GREY.ground, water: GREY.water },
+  { name: "light", label: "Light", land: LIGHT.ground, water: LIGHT.water },
+];
+
+
 const REGULAR = ["Noto Sans Regular"];
 const ITALIC = ["Noto Sans Italic"];
 
@@ -215,6 +319,27 @@ function places(classes: string[], [low, high]: [number | null, number | null]):
   return ["all", ...clauses] as ExpressionSpecification;
 }
 
+/**
+ * A town's label in the Weather layer: its name, then the temperature in the
+ * palette's warm or cold colour, then the wind. Layout, not paint — the colour
+ * lives inside the text — so a switch of basemap sets it again.
+ */
+function weatherText(palette: Palette): ExpressionSpecification {
+  return [
+    "format",
+    ["get", "name"],
+    {},
+    "\n",
+    {},
+    ["coalesce", ["get", "temperature"], ""],
+    { "text-color": ["case", ["has", "cold"], palette.cold, palette.warm] },
+    " ",
+    {},
+    ["coalesce", ["get", "wind"], ""],
+    { "font-scale": 0.9 },
+  ] as ExpressionSpecification;
+}
+
 /** Ranks sort the labels against each other, so the important name wins a collision. */
 const BY_RANK = { "symbol-sort-key": ["get", "rank"] as ExpressionSpecification };
 
@@ -250,6 +375,7 @@ const ground: LayerSpecification[] = [
     type: "fill",
     source: "openmaptiles",
     "source-layer": "water",
+    // The grey's lakes only; light widens it to every water polygon (`LIGHT`).
     filter: ["all", ["==", ["get", "class"], "lake"], ["!=", ["get", "brunnel"], "tunnel"]],
     paint: { "fill-color": INLAND_WATER, "fill-antialias": true },
   },
@@ -688,6 +814,100 @@ const waterLabels: LayerSpecification[] = (
 );
 
 /**
+ * A town's weather, read like Yr's map: the symbol over the name, then the
+ * temperature and the wind with an arrow.
+ *
+ * One symbol per town, icon and text together, so MapLibre's collision hides
+ * a town whole and the gazetteer's rank decides who wins (`sort`, from
+ * `map/symbols.ts`). The icons are not in a sprite: `map/weatherIcons.ts`
+ * supplies each one on `styleimagemissing`. A town with no symbol code keeps
+ * its text — `icon-image` resolves to nothing, which MapLibre draws as no icon.
+ */
+const weatherSymbols: LayerSpecification = {
+  id: WEATHER_SYMBOLS_LAYER_ID,
+  type: "symbol",
+  source: WEATHER_SYMBOLS_SOURCE_ID,
+  layout: {
+    // Shown by the map only in the Weather layer, which also brings its credit.
+    visibility: "none",
+    "icon-image": ["case", ["has", "symbol"], ["concat", ICON_PREFIX, ["get", "symbol"]], ""],
+    "icon-anchor": "bottom",
+    "text-anchor": "top",
+    "text-font": REGULAR,
+    "text-size": byZoom([
+      [4, 11],
+      [10, 14],
+    ]),
+    "text-max-width": 10,
+    "text-field": weatherText(GREY),
+    "symbol-sort-key": ["get", "sort"],
+  },
+  paint: textPaint,
+};
+
+// ---------------------------------------------------------------------------
+// Two basemaps, one style
+// ---------------------------------------------------------------------------
+
+/** One change to the style, the same whether made to the spec or to a live map. */
+export type Restyle =
+  | { layer: string; paint: string; value: unknown }
+  | { layer: string; layout: string; value: unknown }
+  | { layer: string; filter: FilterSpecification };
+
+const LINE_LAYERS = ["coastline", "boundary-country", "boundary-disputed", "boundary-state"];
+
+/**
+ * Everything that differs between basemaps, as changes to make. The style is
+ * built by applying them to the grey spec, and a switch applies them to the
+ * live map (`MapView.vue`), so the two can never disagree — and no `setStyle`
+ * ever takes down deck's layers or the names' data.
+ */
+export function restyle(name: BasemapName): Restyle[] {
+  const p = PALETTES[name];
+  const names = [...placeLabels, ...waterLabels, weatherSymbols].map((layer) => layer.id);
+  return [
+    { layer: "ground", paint: "background-color", value: p.ground },
+    { layer: "lake", paint: "fill-color", value: p.water },
+    { layer: "lake", filter: p.waterFilter },
+    { layer: "waterway", paint: "line-color", value: p.water },
+    ...LINE_LAYERS.flatMap((layer, i) => [
+      { layer, paint: "line-color", value: p.line },
+      { layer, paint: "line-opacity", value: p.lineOpacity[i] },
+    ]),
+    ...names.flatMap((layer) => [
+      { layer, paint: "text-color", value: p.text },
+      { layer, paint: "text-opacity", value: p.textOpacity },
+      { layer, paint: "text-halo-color", value: p.halo },
+      { layer, paint: "text-halo-width", value: p.haloWidth },
+    ]),
+    { layer: WEATHER_SYMBOLS_LAYER_ID, layout: "text-field", value: weatherText(p) },
+    { layer: "shore-shadow", layout: "visibility", value: p.shadow ? undefined : "none" },
+  ];
+}
+
+/** Apply `changes` to a style spec in place, skipping layers it does not have (the shadow may be absent). */
+export function applyRestyle(style: StyleSpecification, changes: Restyle[]): StyleSpecification {
+  for (const change of changes) {
+    const layer = style.layers.find((l) => l.id === change.layer) as unknown as
+      | Record<string, Record<string, unknown> | FilterSpecification | undefined>
+      | undefined;
+    if (!layer) continue;
+    if ("filter" in change) {
+      layer.filter = change.filter;
+      continue;
+    }
+    const [group, property] = "paint" in change ? ["paint", change.paint] : ["layout", change.layout];
+    const properties = (layer[group] ?? {}) as Record<string, unknown>;
+    if (change.value === undefined) delete properties[property];
+    else properties[property] = change.value;
+    if (Object.keys(properties).length === 0) delete layer[group];
+    else layer[group] = properties;
+  }
+  return style;
+}
+
+/**
  * The style, with or without the shadow.
  *
  * A function rather than a constant because the shadow is the one part of
@@ -701,13 +921,26 @@ const waterLabels: LayerSpecification[] = (
  * several hundred 404s on every pan — so "off" has to mean the style does not
  * know the tiles exist.
  */
-export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } = {}): StyleSpecification {
+export function viewerBasemap({
+  shoreShadow = false,
+  basemap = "grey",
+}: { shoreShadow?: boolean; basemap?: BasemapName } = {}): StyleSpecification {
+  // A copy: the layers are this module's constants, and a restyle changes them in place.
+  return applyRestyle(structuredClone(greySpec(shoreShadow)), restyle(basemap));
+}
+
+function greySpec(shoreShadow: boolean): StyleSpecification {
   return {
     version: 8,
     name: "GeoRiva forecast viewer basemap",
     sources: {
       openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
       [PLACES_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      [WEATHER_SYMBOLS_SOURCE_ID]: {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+        attribution: WEATHER_SYMBOLS_CREDIT,
+      },
       ...(shoreShadow
         ? {
             "shore-shadow": {
@@ -727,6 +960,7 @@ export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } =
       ...boundaries,
       ...placeLabels,
       ...waterLabels,
+      weatherSymbols,
     ],
   };
 }

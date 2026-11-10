@@ -39,13 +39,19 @@ GeoRiva's process and talks to it over public HTTP routes only.
   set in `icons.json`. Per organisation.
 - **Source** — one model the viewer can show: one collection, with a name, a
   short descriptor ("9 km") and an order. Owned through its collection.
+  Optionally a **weather symbols model**: the slug of a `georiva-publisher-forti`
+  model whose town forecasts (`/api/forecast/<model>/places/`) the Weather layer
+  draws.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
 - **Settings** — the opening view, per organisation. Not the basemap: the viewer
-  ships one style of its own (`web/src/map/basemap.ts`), a flat neutral grey
-  with no ocean fill, chosen to carry value-encoded rasters and white wind
-  trails, and it cannot be replaced. Land and sea being the same grey, the only
+  ships its own style (`web/src/map/basemap.ts`) in two built-in palettes, and
+  neither can be replaced. **Grey**, a flat neutral grey with no ocean fill,
+  chosen to carry value-encoded rasters and white wind trails, is what the
+  rasters open on; **Light**, core's light colours with the ocean filled, is
+  what Weather opens on. Users switch from the toolbar, and the choice is
+  remembered for each kind of layer. Land and sea being the same grey, the only
   thing separating them is a coastline and the soft shadow in the water beside
   it — raster tiles rendered from Natural Earth and shipped inside the bundle
   ([`docs/shore-shadow.md`](docs/shore-shadow.md)). Everything the viewer draws
@@ -60,6 +66,13 @@ GeoRiva's process and talks to it over public HTTP routes only.
   that is not. Users switch isobars and highs/lows on from the toolbar; both
   start off.
 
+- **Weather layer** — Yr weather symbols over the towns (NRK's icons, CC BY 4.0,
+  credited on the map) and nothing else: no raster, no wind, no pressure. Not a
+  quantity: it is always first in the rail, set apart by a rule, whenever a
+  visible source has a weather symbols model, and it steps through that model's
+  latest run alone. Its name ("Weather" by default) and whether the viewer opens
+  on it (yes by default) are settings.
+
 Admin: *Forecast viewer → Quantities / Sources* (bindings inline on a source),
 and *Settings → Forecast viewer settings*.
 
@@ -71,6 +84,7 @@ and *Settings → Forecast viewer settings*.
   "quantities": [
     {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "sources": [
       {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m",
+       "symbols_model": "ecmwf-ifs",
        "pressure": {"variable": "msl", "interval": 400.0, "to_hpa": 0.01, "version": "…"}},
       {"slug": "wrf", "name": "KMD WRF", "catalog": "models", "collection": "wrf-3km", "variable": "t2"}
     ]},
@@ -95,6 +109,13 @@ pressure variable's own render-config token for its texture's `v=`. A variable
 whose unit stops being a pressure after it was bound (a unit is core's to edit)
 drops the overlay for that source with a logged warning; the route still
 answers.
+
+`weather` carries the layer's `label`, whether it `opens` the viewer, and its
+`sources` — the visible sources with a symbols model, in source order, each
+with `slug`, `name`, `descriptor`, `catalog`, `collection` and `symbols_model`.
+`symbols_model` is also on every source listing, blank when none is set. It is the
+operator's word, not discovered: Forti does not say which collection a model is
+published from, so the viewer is told.
 
 ## Development
 

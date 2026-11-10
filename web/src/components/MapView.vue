@@ -40,6 +40,13 @@
  * value only while the texture on screen is the selected source's variable —
  * a quantity switch keeps the old frame up until the new one lands, and its
  * numbers must not sit under the new legend meanwhile.
+ *
+ * The Weather layer draws nothing of the above: no raster, no wind, no
+ * pressure — the store gives none of them a URL there. It draws the symbols
+ * model's towns instead (`state.symbolsToDraw`), each with its Yr icon,
+ * temperature and wind for the step on screen and its own name: the basemap's
+ * name for the same place gives way (`spokenFor`), and every other basemap
+ * name stays, so a country with no imported towns keeps all of its own.
  */
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 // MapLibre 6 is ESM-only and has no default export, so the namespace import.
@@ -55,13 +62,23 @@ import { ContourLayer, HighLowLayer, ImageType, ParticleLayer, RasterLayer } fro
 import type { PressureOverlay, ViewerConfig } from "../api/types";
 import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
-import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
+import {
+  DATA_ANCHOR_ID,
+  PLACES_SOURCE_ID,
+  WEATHER_SYMBOLS_LAYER_ID,
+  WEATHER_SYMBOLS_SOURCE_ID,
+  restyle,
+  viewerBasemap,
+} from "../map/basemap";
 import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
 import { isobarPalette } from "../map/isobars";
 import { particleCount, type Bounds } from "../map/particles";
 import { placesWithValues, VALUED_CLASSES } from "../map/places";
 import { readValue } from "../map/sample";
+import { spokenFor } from "../map/symbols";
 import { loadTexture, type Texture } from "../map/texture";
+import { FIT_DURATION_MS, FIT_MAX_ZOOM, Framer, fitPadding, type Extent } from "../map/framing";
+import { serveWeatherIcons } from "../map/weatherIcons";
 import { attachMap } from "../map/zoom";
 import { useViewer } from "../state/store";
 
@@ -352,7 +369,10 @@ function refreshPlaces() {
     placesQueued = false;
     const target = map?.getSource<GeoJSONSource>(PLACES_SOURCE_ID);
     if (!map || !target) return;
-    const features = map.querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES });
+    const spoken = spokenFor(viewer.symbolsToDraw.value);
+    const features = map
+      .querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES })
+      .filter((place) => place.geometry.type !== "Point" || !spoken(...(place.geometry.coordinates as [number, number])));
     const texture = raster.texture.value;
     const current = texture && raster.shows.value?.of === selectedScalar.value ? texture : null;
     const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat) : () => null;
@@ -361,6 +381,100 @@ function refreshPlaces() {
 }
 
 watch([raster.texture, raster.shows, selectedScalar, () => viewer.quantity.value?.decimals], refreshPlaces);
+
+const EMPTY = { type: "FeatureCollection" as const, features: [] };
+
+/**
+ * Put the step's symbols on the map, or take them off. The layer is hidden
+ * outside Weather rather than merely emptied, so its source — and the icons'
+ * credit with it — leaves the attribution too.
+ */
+function drawSymbols() {
+  if (!map?.getLayer(WEATHER_SYMBOLS_LAYER_ID)) return;
+  map.getSource<GeoJSONSource>(WEATHER_SYMBOLS_SOURCE_ID)?.setData(viewer.symbolsToDraw.value ?? EMPTY);
+  map.setLayoutProperty(WEATHER_SYMBOLS_LAYER_ID, "visibility", viewer.weather.value ? "visible" : "none");
+}
+
+// The names follow too: the basemap's own give way only where a town is drawn.
+watch([viewer.symbolsToDraw, viewer.weather], () => {
+  drawSymbols();
+  refreshPlaces();
+});
+
+/**
+ * Recolour the live map for another basemap (`restyle`): the same changes the
+ * style was built with, so nothing — deck's layers, the names' data, the
+ * symbols — is rebuilt. A layer the style lacks (the shadow, when off) is skipped.
+ */
+function applyBasemap() {
+  if (!map) return;
+  for (const change of restyle(viewer.basemap.value)) {
+    if (!map.getLayer(change.layer)) continue;
+    if ("filter" in change) map.setFilter(change.layer, change.filter);
+    else if ("paint" in change) {
+      map.setPaintProperty(
+        change.layer,
+        change.paint as Parameters<typeof map.setPaintProperty>[1],
+        change.value as Parameters<typeof map.setPaintProperty>[2],
+      );
+    } else {
+      // An unset layout property is its default; for visibility, that is shown.
+      const value = change.value ?? (change.layout === "visibility" ? "visible" : undefined);
+      map.setLayoutProperty(
+        change.layer,
+        change.layout as Parameters<typeof map.setLayoutProperty>[1],
+        value as Parameters<typeof map.setLayoutProperty>[2],
+      );
+    }
+  }
+}
+
+watch(viewer.basemap, applyBasemap);
+
+/**
+ * Framing a switch (`map/framing.ts`): a request when the store counts one, a
+ * move — or none — once the new model's bounds are here, withdrawn if the user
+ * moves the map first.
+ */
+const framer = new Framer();
+const NARROW = "(max-width: 720px)";
+
+function viewExtent(): Extent | null {
+  if (!map) return null;
+  const b = map.getBounds();
+  return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+}
+
+function frame() {
+  const bounds = viewer.frameBounds.value;
+  const view = viewExtent();
+  if (!map || !bounds || !view) return;
+  const target = framer.arrived(view, bounds);
+  if (!target) return;
+  const rail = document.getElementById("layers-menu");
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  map.fitBounds(
+    [
+      [target[0], target[1]],
+      [target[2], target[3]],
+    ],
+    {
+      padding: fitPadding({
+        narrow: window.matchMedia?.(NARROW).matches ?? false,
+        railOpen: !!rail && rail.offsetParent !== null,
+      }),
+      maxZoom: FIT_MAX_ZOOM,
+      duration: reduced ? 0 : FIT_DURATION_MS,
+    },
+  );
+}
+
+watch(viewer.frameRequests, () => {
+  framer.request();
+  // Entering Weather on a model whose area is already loaded frames at once.
+  frame();
+});
+watch(viewer.frameBounds, frame);
 
 function readViewport() {
   if (!map) return;
@@ -374,14 +488,21 @@ onMounted(() => {
     container: container.value,
     // The shadow is in the style only if this organisation switched it on and
     // the server it came from has the tiles; the catalogue answers both as one.
-    style: greyBasemap({ shoreShadow: props.config.shore_shadow }),
+    style: viewerBasemap({ shoreShadow: props.config.shore_shadow, basemap: viewer.basemap.value }),
     center: props.config.default_view.center,
     zoom: props.config.default_view.zoom,
     attributionControl: { compact: true },
   });
   // No NavigationControl: zoom lives in the toolbar, which drives this map
   // through `map/zoom.ts`.
-  attachMap(map);  // On `moveend`, not `move`: the budget only moves in powers of two, and
+  attachMap(map);
+  serveWeatherIcons(map, drawSymbols);
+  // A gesture carries its DOM event; the toolbar's zoom says `byUser`. Our own
+  // framing carries neither, so it never cancels itself.
+  map.on("movestart", (event) => {
+    if (event.originalEvent || (event as { byUser?: boolean }).byUser) framer.userMoved();
+  });
+  // On `moveend`, not `move`: the budget only moves in powers of two, and
   // resizing it mid-gesture would restart every trail (see `map/particles.ts`).
   map.on("moveend", () => {
     readViewport();
@@ -396,6 +517,7 @@ onMounted(() => {
     overlay = new MapLibreOverlay({ interleaved: true, layers: layers() });
     map!.addControl(overlay);
     refreshPlaces();
+    drawSymbols();
   });
 });
 

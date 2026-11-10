@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Catalogue } from "../api/types";
 import { initialSelection, selectQuantity, selectSource, sourcesFor } from "./selection";
 
-const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs", version: "v1", descriptor: "" };
-const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2", descriptor: "" };
+const ifs = { slug: "ifs", name: "ECMWF IFS", catalog: "models", collection: "ecmwf-ifs", version: "v1", descriptor: "", symbols_model: "" };
+const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-3km", version: "v2", descriptor: "", symbols_model: "" };
 
 const catalogue: Catalogue = {
   config: { org: "kmd", org_name: "KMD", default_view: { center: [20, 0], zoom: 3 }, shore_shadow: false },
+  weather: { label: "Weather", opens: false, sources: [] },
   quantities: [
     {
       slug: "t2m",

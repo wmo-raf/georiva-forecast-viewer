@@ -1,9 +1,14 @@
 <script setup lang="ts">
 /**
- * The left rail: the quantities a user can show. The map draws the selected
+ * The left rail: the layers a user can show. The map draws the selected
  * scalar quantity with wind and the pressure overlay over it, so the list is
  * scalar quantities only; wind and pressure are the toolbar's, which owns
  * their switches and settings.
+ *
+ * Above them, when any model can draw it, the Weather layer: Yr symbols over
+ * the towns and nothing else (`state/weather.ts`). Always first, under the
+ * operator's name for it, and set apart from the quantities by a rule — it is
+ * a different kind of map, not another field.
  *
  * It collapses behind a pill that names the quantity on the map. The pill is
  * the only thing that opens or closes it: picking a quantity, Escape and the
@@ -13,10 +18,15 @@
  * Until the catalogue lands the pill and the list are skeletons: the frame is
  * up from the first paint, and they fill in where they stand.
  */
-import { ChevronDown } from "lucide-vue-next";
+import { ChevronDown, CloudSun } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useViewer } from "../state/store";
+import type { Quantity } from "../api/types";
+import { isWeather } from "../state/weather";
 import { iconFor } from "../ui/icons";
+
+/** Weather's icon is fixed; a quantity's is the operator's choice. */
+const glyph = (q: Quantity) => (isWeather(q.slug) ? CloudSun : iconFor(q.icon));
 
 /** The narrow breakpoint, the same one `style.css` switches layout at. */
 const NARROW = "(max-width: 720px)";
@@ -40,7 +50,7 @@ const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).m
     >
       <template v-if="selectedQuantity">
         <component
-          :is="iconFor(selectedQuantity.icon)"
+          :is="glyph(selectedQuantity)"
           class="layers__icon"
           :size="16"
           :stroke-width="1.75"
@@ -65,20 +75,21 @@ const open = ref(typeof window === "undefined" || !window.matchMedia?.(NARROW).m
             <span class="skel skel--line" :style="{ width: `${[96, 72, 110, 84][n - 1]}px` }"></span>
           </div>
         </div>
-        <div v-else class="rail__list" role="radiogroup" aria-label="Quantity">
-          <button
-            v-for="q in viewer.scalarQuantities.value"
-            :key="q.slug"
-            type="button"
-            role="radio"
-            :aria-checked="q.slug === selected"
-            class="rail__item"
-            :class="{ 'rail__item--selected': q.slug === selected }"
-            @click="viewer.pickQuantity(q.slug)"
-          >
-            <component :is="iconFor(q.icon)" class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
-            <span class="rail__label" :title="q.name">{{ q.name }}</span>
-          </button>
+        <div v-else class="rail__list" role="radiogroup" aria-label="Layer">
+          <template v-for="q in viewer.scalarQuantities.value" :key="q.slug">
+            <button
+              type="button"
+              role="radio"
+              :aria-checked="q.slug === selected"
+              class="rail__item"
+              :class="{ 'rail__item--selected': q.slug === selected }"
+              @click="viewer.pickQuantity(q.slug)"
+            >
+              <component :is="glyph(q)" class="rail__icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
+              <span class="rail__label" :title="q.name">{{ q.name }}</span>
+            </button>
+            <hr v-if="isWeather(q.slug) && viewer.scalarQuantities.value.length > 1" class="rail__separator" />
+          </template>
         </div>
       </aside>
     </Transition>

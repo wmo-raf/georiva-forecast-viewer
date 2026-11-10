@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "./basemap";
+import {
+  DATA_ANCHOR_ID,
+  PLACES_SOURCE_ID,
+  WEATHER_SYMBOLS_LAYER_ID,
+  WEATHER_SYMBOLS_SOURCE_ID,
+  applyRestyle,
+  restyle,
+  viewerBasemap as greyBasemap,
+  viewerBasemap,
+} from "./basemap";
 import { VALUED_CLASSES } from "./places";
 
 /**
@@ -148,13 +157,14 @@ describe("asset references", () => {
   });
 
   /**
-   * Nothing draws an icon, which is why no sprite is declared. The two travel
-   * together: an `icon-image` added later without a sprite is a label that
-   * silently loses half of itself.
+   * No sprite is declared, so the one layer that asks for icons is the weather
+   * symbols', whose icons `map/weatherIcons.ts` adds as they are needed. An
+   * `icon-image` anywhere else would be a label that silently loses half of
+   * itself.
    */
-  it("ask for no icon, and so declare no sprite", () => {
+  it("ask for icons only on the weather symbols, and declare no sprite", () => {
     for (const layer of GREY_BASEMAP.layers) {
-      if (layer.type !== "symbol") continue;
+      if (layer.type !== "symbol" || layer.id === WEATHER_SYMBOLS_LAYER_ID) continue;
       expect(layer.layout?.["icon-image"], `${layer.id} wants an icon but the style has no sprite`).toBeUndefined();
     }
     expect(GREY_BASEMAP.sprite).toBeUndefined();
@@ -268,5 +278,57 @@ describe("without the shore shadow", () => {
       if (!("source" in layer) || layer.source === undefined) continue;
       expect(declared, `${layer.id} names an undeclared source`).toContain(layer.source);
     }
+  });
+});
+
+describe("the weather symbols", () => {
+  /** CC BY 4.0 asks for the credit wherever the icons are shown, and only then is it true. */
+  it("credit Yr/NRK on their own source, and start hidden until Weather is chosen", () => {
+    const source = GREY_BASEMAP.sources[WEATHER_SYMBOLS_SOURCE_ID] as { attribution?: string };
+    expect(source.attribution).toContain("Yr/NRK");
+    expect(source.attribution).toContain("CC BY 4.0");
+    const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { layout?: Record<string, unknown> };
+    expect(layer.layout?.visibility).toBe("none");
+  });
+
+  it("draw over every other name, from their own source", () => {
+    const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { source?: string };
+    expect(layer.source).toBe(WEATHER_SYMBOLS_SOURCE_ID);
+    expect(ids.at(-1)).toBe(WEATHER_SYMBOLS_LAYER_ID);
+  });
+});
+
+describe("the light basemap", () => {
+  const light = viewerBasemap({ shoreShadow: true, basemap: "light" });
+  type Loose = { filter?: unknown; layout?: Record<string, unknown>; paint: Record<string, unknown> };
+  const layerOf = (style: typeof light, id: string) => style.layers.find((l) => l.id === id) as unknown as Loose;
+
+  /** A restyle naming a layer the style lacks throws on the live map, not here — so it is checked here. */
+  it("restyles only layers the style has", () => {
+    const names = new Set(GREY_BASEMAP.layers.map((layer) => layer.id));
+    for (const basemap of ["grey", "light"] as const) {
+      for (const op of restyle(basemap)) expect(names, `${op.layer} is not in the style`).toContain(op.layer);
+    }
+  });
+
+  /** A switch is a restyle of the live map, so it must round-trip: light and back is exactly grey. */
+  it("switches back to exactly the grey it came from", () => {
+    expect(applyRestyle(structuredClone(light), restyle("grey"))).toEqual(GREY_BASEMAP);
+    expect(applyRestyle(structuredClone(GREY_BASEMAP), restyle("light"))).toEqual(light);
+  });
+
+  it("fills the ocean, which on grey is the bare ground", () => {
+    expect(JSON.stringify(layerOf(GREY_BASEMAP, "lake").filter)).toContain('"lake"');
+    expect(JSON.stringify(layerOf(light, "lake").filter)).not.toContain('"lake"');
+  });
+
+  it("hides the shore's shadow, which on pale water would read as a stain", () => {
+    expect(layerOf(light, "shore-shadow").layout?.visibility).toBe("none");
+    expect(layerOf(GREY_BASEMAP, "shore-shadow").layout?.visibility ?? "visible").toBe("visible");
+  });
+
+  it("writes the names dark, on a light halo", () => {
+    expect(layerOf(light, "city-lg").paint["text-halo-color"]).toBe("#ffffff");
+    expect(layerOf(GREY_BASEMAP, "city-lg").paint["text-halo-color"]).not.toBe("#ffffff");
   });
 });

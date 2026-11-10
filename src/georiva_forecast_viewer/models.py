@@ -24,6 +24,7 @@ from django.db import models
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail.admin.forms import WagtailAdminModelForm
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 
 from georiva.organisations.access import organisation_of
@@ -126,6 +127,17 @@ class ForecastSource(ClusterableModel):
         help_text="A short tag shown beside the name, e.g. '9 km' or 'global'.",
     )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")
+    symbols_model = models.SlugField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Weather symbols model",
+        help_text=(
+            "The Forti forecast model (its slug under /api/forecast/) whose town "
+            "forecasts this source's weather symbols layer shows. Leave blank for "
+            "no symbols. Symbols are shown only for the run that model last published."
+        ),
+    )
 
     class Meta:
         verbose_name = "source"
@@ -324,6 +336,43 @@ class ForecastViewerSettings(BaseSiteSetting):
         verbose_name="Isobar interval (hPa)",
         help_text="Spacing between isobars. 4 hPa is the synoptic convention; 2 hPa suits the tropics.",
     )
+
+    #: The Weather layer: Yr symbols over the towns, from each source's
+    #: ``symbols_model``, and nothing else on the map. Not a quantity — it has
+    #: no variable and no colour scale — so it is configured here, like the
+    #: pressure overlay, and always sits first in the rail when any visible
+    #: source can draw it.
+    weather_label = models.CharField(
+        max_length=50,
+        default="Weather",
+        verbose_name="Weather layer name",
+        help_text="What the rail calls the weather symbols layer, e.g. 'Weather' or 'Météo'.",
+    )
+    weather_opens = models.BooleanField(
+        default=True,
+        verbose_name="Open on the Weather layer",
+        help_text=(
+            "Open the viewer on the weather symbols rather than the first quantity, "
+            "when a source has a weather symbols model. It opens at the opening view "
+            "above; set that to your country to land on your towns."
+        ),
+    )
+
+    panels = [
+        MultiFieldPanel(
+            [FieldPanel("default_longitude"), FieldPanel("default_latitude"), FieldPanel("default_zoom")],
+            heading="Opening view",
+        ),
+        FieldPanel("shore_shadow"),
+        MultiFieldPanel(
+            [FieldPanel("pressure_quantity"), FieldPanel("isobar_interval_hpa")], heading="Pressure overlay"
+        ),
+        MultiFieldPanel(
+            [FieldPanel("weather_label"), FieldPanel("weather_opens")],
+            heading="Weather layer",
+            help_text="Yr weather symbols over the towns, from each source's weather symbols model.",
+        ),
+    ]
 
     class Meta:
         verbose_name = "Forecast viewer settings"

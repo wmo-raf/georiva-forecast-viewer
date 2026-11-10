@@ -29,7 +29,8 @@ export function useZoom() {
     ready: computed(() => map.value !== null),
     canZoomIn: computed(() => !!map.value && zoom.value < map.value.getMaxZoom()),
     canZoomOut: computed(() => !!map.value && zoom.value > map.value.getMinZoom()),
-    zoomIn: () => map.value?.zoomIn(),
-    zoomOut: () => map.value?.zoomOut(),
+    // Marked as the user's, like a wheel or a pinch: a pending framing gives way to it.
+    zoomIn: () => map.value?.zoomIn(undefined, { byUser: true }),
+    zoomOut: () => map.value?.zoomOut(undefined, { byUser: true }),
   };
 }

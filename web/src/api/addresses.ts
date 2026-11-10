@@ -20,6 +20,11 @@ export function runsUrl(source: Source): string {
   return `/api/runs/${source.catalog}/${source.collection}/?limit=${RUNS_LIMIT}`;
 }
 
+/** A Forti model's whole latest run, told for its towns. */
+export function placesUrl(model: string): string {
+  return `/api/forecast/${encodeURIComponent(model)}/places/`;
+}
+
 export function edrCollectionUrl(source: Source): string {
   return `/api/edr/collections/${source.collection}/`;
 }

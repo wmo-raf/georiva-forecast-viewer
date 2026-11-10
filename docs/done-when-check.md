@@ -71,18 +71,19 @@ install log. Filed as wmo-raf/georiva#602; see item 7.
 ## 2. `web/` uses only public HTTP routes, with no private routes or workarounds
 
 **Yes.** Every GeoRiva address the bundle builds lives in `src/api/addresses.ts`
-— five of them, all public, all relative to the page's own origin:
+— six of them, all public, all relative to the page's own origin:
 
 ```
 /api/forecast-viewer/                                             this plugin's catalogue
 /api/runs/<catalog>/<collection>/?limit=200                       core #592
 /api/edr/collections/<collection>/                                core EDR
+/api/forecast/<model>/places/                                     georiva-publisher-forti (weather symbols)
 /titiler/<org>/<cat>/<coll>/<var>/encoded-preview.png             core ADR 0021
 /titiler/<org>/<cat>/<coll>/vector-preview.png?u_variable=…       core #593
 ```
 
 `grep -rE "https?://|/api/|/titiler/|/martin/" src/` outside the tests finds
-exactly those five plus one more string: the built-in default basemap style URL
+exactly those six plus one more string: the built-in default basemap style URL
 in `MapView.vue`, which an organisation replaces in the admin. The two `fetch`
 calls in the bundle (`api/client.ts`, `map/texture.ts`) are both handed a URL
 that `addresses.ts` built — neither assembles one of its own.
@@ -316,3 +317,11 @@ reason not to treat it as a reference beyond the shore: at z7 and z8 most of
 its ink is **rivers and administrative lines**, not a shore shadow. An inland
 z8 tile over northern India is a dense web of them. Ours is empty there, which
 is what a shore shadow should be.
+
+## Since this walk — 2026-11-10, a second basemap
+
+The style in `web/src/map/basemap.ts` now has two palettes, **Grey** and
+**Light**, over the same layers and the same sources: a switch recolours the
+live map (`restyle`) and never loads another style. Light adds no host — the
+same OpenFreeMap tiles and fonts, still no sprite — so §2's list of addresses
+is unchanged, and neither palette can be replaced by an organisation.

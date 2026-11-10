@@ -8,6 +8,7 @@ const source = {
   collection: "ecmwf-ifs",
   variable: "t2m",
   descriptor: "",
+  symbols_model: "",
   version: "ab12cd34",
 };
 

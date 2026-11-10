@@ -65,6 +65,7 @@ class CatalogueTests(TestCase):
                             "collection": "ecmwf-ifs",
                             "variable": "t2m",
                             "descriptor": "",
+                            "symbols_model": "",
                             "version": ANY,
                         },
                         {
@@ -74,6 +75,7 @@ class CatalogueTests(TestCase):
                             "collection": "wrf-3km",
                             "variable": "t2",
                             "descriptor": "",
+                            "symbols_model": "",
                             "version": ANY,
                         },
                     ],
@@ -96,6 +98,27 @@ class CatalogueTests(TestCase):
 
         [quantity] = self._quantities()
         self.assertEqual(quantity["decimals"], 1)
+
+    def test_a_source_names_the_forecast_model_its_weather_symbols_come_from(self):
+        """The Forti model a source's symbol layer reads (``/api/forecast/{model}/places/``).
+
+        Configured, not discovered: Forti does not say which collection a model
+        is published from (its D17), so the operator who binds the source says
+        which model goes with it.
+        """
+        temperature = make_quantity("t2m")
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs", symbols_model="ecmwf-ifs")
+        bind(ifs, temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["sources"][0]["symbols_model"], "ecmwf-ifs")
+
+    def test_a_source_with_no_symbols_model_says_so_with_a_blank(self):
+        temperature = make_quantity("t2m")
+        bind(make_source(make_collection("ecmwf-ifs"), slug="ifs"), temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["sources"][0]["symbols_model"], "")
 
     def test_an_unset_icon_and_descriptor_are_blank_strings(self):
         temperature = make_quantity("t2m")
@@ -314,3 +337,79 @@ class PressureOverlayTests(TestCase):
             sources = self._sources()
         self.assertEqual(sources["ifs"]["variable"], "msl")
         self.assertNotIn("pressure", sources["ifs"])
+
+
+class WeatherLayerTests(TestCase):
+    """The Weather layer: the operator's label and opening choice, and the sources that can draw it.
+
+    Not a quantity: a source joins it by naming the Forti model its symbols come
+    from, and the route lists exactly the visible sources that do, in source order.
+    """
+
+    def setUp(self):
+        dial_org(self.client)
+
+    def _weather(self):
+        return self.client.get(reverse(URL)).json()["weather"]
+
+    def _settings(self):
+        return ForecastViewerSettings.for_site(Site.objects.get(organisation__slug=DEFAULT_TEST_ORG_SLUG))
+
+    def test_it_is_called_weather_and_opens_the_viewer_by_default(self):
+        weather = self._weather()
+        self.assertEqual(weather["label"], "Weather")
+        self.assertTrue(weather["opens"])
+
+    def test_the_operator_names_it_and_chooses_whether_it_opens(self):
+        settings = self._settings()
+        settings.weather_label = "Météo"
+        settings.weather_opens = False
+        settings.save()
+
+        weather = self._weather()
+        self.assertEqual(weather["label"], "Météo")
+        self.assertFalse(weather["opens"])
+
+    def test_it_lists_the_sources_with_a_symbols_model_in_their_order(self):
+        make_source(
+            make_collection("wrf-3km", variables=WRF_VARIABLES),
+            slug="wrf",
+            name="KMD WRF",
+            order=0,
+            symbols_model="kmsa-nwp",
+            descriptor="3 km",
+        )
+        make_source(make_collection("ecmwf-ifs"), slug="ifs", name="ECMWF IFS", order=1, symbols_model="ecmwf-ifs")
+        make_source(make_collection("gfs"), slug="gfs", name="GFS", order=2)
+
+        self.assertEqual(
+            self._weather()["sources"],
+            [
+                {
+                    "slug": "wrf",
+                    "name": "KMD WRF",
+                    "descriptor": "3 km",
+                    "catalog": "models",
+                    "collection": "wrf-3km",
+                    "symbols_model": "kmsa-nwp",
+                },
+                {
+                    "slug": "ifs",
+                    "name": "ECMWF IFS",
+                    "descriptor": "",
+                    "catalog": "models",
+                    "collection": "ecmwf-ifs",
+                    "symbols_model": "ecmwf-ifs",
+                },
+            ],
+        )
+
+    def test_a_source_the_caller_may_not_see_is_absent(self):
+        make_source(make_collection("closed", visibility="private"), slug="closed", symbols_model="ecmwf-ifs")
+
+        self.assertEqual(self._weather()["sources"], [])
+
+    def test_another_organisations_source_never_appears(self):
+        make_source(make_collection("theirs", org_slug="other-org"), slug="theirs", symbols_model="ecmwf-ifs")
+
+        self.assertEqual(self._weather()["sources"], [])
