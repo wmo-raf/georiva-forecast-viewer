@@ -23,22 +23,24 @@ items.
 
 ## Result
 
-Six of the seven items hold outright. Item 1 holds in its "shows IFS and WRF"
-half only: the install it names was not performed, for the reason below. Three
-core gaps were found and filed — wmo-raf/georiva#600, #601 and #602.
+All seven items hold. Six held outright on this walk; item 1 held here in its
+"shows IFS and WRF" half only, and its fresh-install half was confirmed later on
+a real server (see the last section). Three core gaps were found and filed —
+wmo-raf/georiva#600, #601 and #602.
 
 **Not covered:** a genuinely fresh install — `plugins.toml` → clone at a tag →
 `pip install` → `collectstatic` → nginx — was not run end to end, because doing
 it on this machine means destroying the dev stack's ingested data. The
 installer's manifest parsing was exercised directly (item 1 below), and the
 release workflow already rehearses clone-and-`collectstatic` before it pushes a
-tag. The remaining untested step is a first `up` on an empty volume.
+tag. The remaining untested step was a first `up` on an empty volume; it has
+since been run on a real server (see the last section).
 
 ## 1. A fresh install with the plugin and frontend deployed shows IFS and WRF
 
-**Partly: the viewer shows both models, but not from a fresh install.** The
-"shows IFS and WRF" half is checked; the "fresh install" half is the gap named
-above, and this item stays open until someone runs it on an empty volume. One
+**Yes — confirmed in two steps.** On this walk the viewer showed both models,
+but not from a fresh install; the "fresh install" half was the gap named above.
+It was closed later by a real-server install (see the last section). One
 documentation bug was found and fixed on the way.
 
 The viewer loads at `/static/forecast_viewer/index.html`, lists both models in
@@ -316,3 +318,19 @@ reason not to treat it as a reference beyond the shore: at z7 and z8 most of
 its ink is **rivers and administrative lines**, not a shore shadow. An inland
 z8 tile over northern India is a dense web of them. Ours is empty there, which
 is what a shore shadow should be.
+
+## Since this walk — 2026-11-10, the fresh install
+
+Item 1's missing half has been run. The viewer was installed on a real server
+the way an operator installs it: an entry in `plugins.toml`, then
+`./deploy.sh plugins`, which installs into the shared plugins volume
+(ADR 0035) and restarts the services that load it. No bind mount and no
+hand-run `collectstatic`. On that server the viewer shows both IFS and WRF.
+
+The address has also changed since this walk. wmo-raf/georiva#601 gave plugins
+a page route (ADR 0039), so the viewer is now served at
+`/app/forecast-viewer/` instead of `/static/forecast_viewer/index.html`.
+
+With that, all seven items hold and wmo-raf/georiva#594 is closed.
+wmo-raf/georiva#602, the installer's silence on a manifest with no `plugins`
+table, is still open in core and is tracked on its own.
