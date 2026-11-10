@@ -51,8 +51,9 @@ GeoRiva's process and talks to it over public HTTP routes only.
   ([`docs/shore-shadow.md`](docs/shore-shadow.md)). Everything the viewer draws
   comes from GeoRiva or OpenFreeMap; no other host is reached.
 - **Pressure overlay** — also a setting: which scalar quantity is mean sea level
-  pressure, and the isobar interval in hPa (4 by default; every fifth line is
-  drawn bolder). It is drawn as isobars and highs/lows over *any* raster, the
+  pressure, and the isobar interval in hPa (4 by default, the synoptic
+  convention; 2 suits the tropics). It is drawn as isobars and highs/lows over
+  *any* raster, the
   way wind is, from each source's own binding of that quantity; the quantity
   stays in the rail as an ordinary raster too. Every variable bound to it must
   be stored in a pressure unit — the setting and the binding both refuse one

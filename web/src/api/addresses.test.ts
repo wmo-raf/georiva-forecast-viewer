@@ -34,6 +34,11 @@ describe("every address the viewer asks GeoRiva for", () => {
     );
   });
 
+  it("another variable of the same source, keyed by that variable's own token", () => {
+    const url = encodedPreviewUrl("kmd", source, "msl", "2026-11-03T15:00:00+00:00", null, "ee99ff00");
+    expect(url).toBe("/titiler/kmd/models/ecmwf-ifs/msl/encoded-preview.png?time=2026-11-03T15%3A00%3A00%2B00%3A00&v=ee99ff00");
+  });
+
   it("the two-band vector texture, on the collection, with the pair named in the query", () => {
     const url = vectorPreviewUrl("kmd", wind, "2026-11-03T15:00:00+00:00", "2026-11-03T12:00:00+00:00");
     expect(url).toBe(

@@ -255,6 +255,12 @@ class ForecastViewerSettingsForm(WagtailAdminModelForm):
     The settings page is Wagtail's own and not one of the org-scoped viewsets,
     so its one chooser is narrowed here: unnarrowed, it would list every
     tenant's quantity names. ``clean`` is the refusal; this is the hint.
+
+    Narrowed by the settings row's own organisation rather than through
+    ``scope_rows``, deliberately: a form has no request to scope by, and the
+    row being edited *is* the organisation's — a Site setting is per Site, and
+    the Site is the organisation. ``QuantityBinding.clean`` compares owners
+    the same way, for the same reason.
     """
 
     def __init__(self, *args, **kwargs):
@@ -316,7 +322,7 @@ class ForecastViewerSettings(BaseSiteSetting):
         default=4.0,
         validators=[MinValueValidator(0.5)],
         verbose_name="Isobar interval (hPa)",
-        help_text="Spacing between isobars; every fifth is drawn bolder.",
+        help_text="Spacing between isobars. 4 hPa is the synoptic convention; 2 hPa suits the tropics.",
     )
 
     class Meta:

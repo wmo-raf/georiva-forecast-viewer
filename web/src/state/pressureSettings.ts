@@ -8,7 +8,7 @@
  * existed, and a user who never turns either on never fetches its texture.
  */
 
-import { browserStorage } from "./storage";
+import { browserStorage, loadRemembered, saveRemembered } from "./storage";
 
 export interface PressureSettings {
   isobars: boolean;
@@ -34,18 +34,9 @@ export function pressureWanted(settings: PressureSettings): boolean {
 }
 
 export function loadPressureSettings(storage: Storage | null = browserStorage()): PressureSettings {
-  try {
-    const stored = storage?.getItem(STORAGE_KEY);
-    return sanitizePressure(stored ? JSON.parse(stored) : null);
-  } catch {
-    return { ...DEFAULT_PRESSURE };
-  }
+  return loadRemembered(STORAGE_KEY, sanitizePressure, storage);
 }
 
 export function savePressureSettings(settings: PressureSettings, storage: Storage | null = browserStorage()): void {
-  try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Full, blocked or private: the settings still hold for this visit.
-  }
+  saveRemembered(STORAGE_KEY, settings, storage);
 }

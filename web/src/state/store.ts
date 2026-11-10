@@ -80,9 +80,9 @@ watch(
 const keyOf = (source: Source) => `${source.catalog}/${source.collection}`;
 
 /**
- * The map shows a fixed pair: one scalar quantity as the raster, plus wind.
- * So the list a user picks from is the scalar quantities, and the selection
- * rules run over that view of the catalogue.
+ * The map shows one scalar quantity as the raster, with wind and the pressure
+ * overlay drawn over it. So the list a user picks from is the scalar
+ * quantities, and the selection rules run over that view of the catalogue.
  */
 const scalarView = computed<Catalogue | null>(() =>
   state.catalogue
@@ -121,10 +121,10 @@ const windToDraw = computed<Source | null>(() => (state.wind.on ? windBinding.va
  * this source binds it. Every listing of a source carries it, so the selected
  * scalar's listing is enough.
  */
-const pressureBinding = computed(() => source.value?.pressure ?? null);
+const pressureOverlay = computed(() => source.value?.pressure ?? null);
 
 /** The overlay the map should fetch: something is switched on and the source has one. Null otherwise. */
-const pressureToDraw = computed(() => (pressureWanted(state.pressure) ? pressureBinding.value : null));
+const pressureToDraw = computed(() => (pressureWanted(state.pressure) ? pressureOverlay.value : null));
 
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
@@ -213,13 +213,7 @@ const pressureTextureUrl = computed(() => {
   const org = state.catalogue?.config.org;
   const pressure = pressureToDraw.value;
   if (!org || !source.value || !pressure || !time.value || !run.value) return null;
-  return encodedPreviewUrl(
-    org,
-    { ...source.value, version: pressure.version },
-    pressure.variable,
-    time.value,
-    run.value.reference_time,
-  );
+  return encodedPreviewUrl(org, source.value, pressure.variable, time.value, run.value.reference_time, pressure.version);
 });
 
 async function load() {
@@ -317,7 +311,7 @@ export function useViewer() {
     source,
     windBinding,
     windToDraw,
-    pressureBinding,
+    pressureOverlay,
     pressureToDraw,
     timelineCurrent,
     loading,

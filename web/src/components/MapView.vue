@@ -6,18 +6,19 @@
  * pressure as isobars and highs/lows (one texture for both).
  *
  * The basemap is the viewer's own, bundled rather than fetched (`map/basemap.ts`):
- * one dark grey ground, no variants, no operator override. Both deck layers
- * insert before its `georiva-data-anchor`, so the data draws above the ground
+ * one dark grey ground, no variants, no operator override. Every deck layer
+ * inserts before its `georiva-data-anchor`, so the data draws above the ground
  * and below the shore's shadow, the borders and the names. All carry the same
  * `beforeId` and so share one layer group: deck inserts them at a single point
  * in the style, in array order — raster, isobars, trails, H/L labels — and
  * nothing in the basemap can be placed between them.
  *
- * Both come from value-encoded textures derived per request (core's ADR 0021),
- * one band for the scalar and two for the wind pair (core's #593). Values, not
- * colours: the palette from EDR is applied on the GPU, so a palette change
- * repaints rather than refetches, and the wind's u and v survive the trip as
- * numbers the particle layer can integrate.
+ * All of them come from value-encoded textures derived per request (core's
+ * ADR 0021): one band for the scalar and for pressure, two for the wind pair
+ * (core's #593). Values, not colours: the palette from EDR is applied on the
+ * GPU, so a palette change repaints rather than refetches, the wind's u and v
+ * survive the trip as numbers the particle layer can integrate, and isobars
+ * and highs/lows are found in the pressure field itself.
  *
  * Each texture has its own slot, loaded independently and holding the last
  * frame that arrived. A step is "ready" only once all have settled, so
@@ -51,11 +52,11 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ContourLayer, HighLowLayer, ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
-import type { ViewerConfig } from "../api/types";
+import type { PressureOverlay, ViewerConfig } from "../api/types";
 import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
 import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
-import { highLowRadiusKm, pressureLabel } from "../map/highlow";
+import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
 import { particleCount, type Bounds } from "../map/particles";
 import { placesWithValues, VALUED_CLASSES } from "../map/places";
 import { readValue } from "../map/sample";
@@ -83,26 +84,34 @@ const WIND = {
 };
 
 /**
- * Isobars in dark charcoal, so they never read as the white wind trails and
- * hold up over warm and cool palettes alike. Every fifth line is major; the
- * interval itself is the operator's, per source.
+ * Isobars as Windy draws them: thin pale-green hairlines, every line the same.
  *
- * `width` and the alpha are the *major* line's: the layer's shader draws every
- * minor line at half the width and half the alpha, and fades both edges. So a
- * major line here is 3 px at 90 % and a minor one 1.5 px at 45 %. Anything
- * lighter loses the minor lines among the wind trails: 1 px at 60 % and 2 px
- * at 80 % were both tried against IFS over Africa, and neither showed the
- * 1016 hPa line running between a 1020 high and a 1012 low.
+ * Uniform on purpose. The layer can mark every nth line "major", but only by
+ * drawing every *other* line at half the width and half the alpha, which made
+ * the minor lines vanish among the trails; with `majorInterval` equal to the
+ * interval, no line is minor. The interval is the operator's, per source.
  */
 const ISOBARS = {
-  color: [25, 25, 25, 230] as [number, number, number, number],
-  width: 3,
-  majorEvery: 5,
+  color: [198, 251, 196, 191] as [number, number, number, number],
+  width: 1.5,
+};
+
+/**
+ * Highs and lows: white, larger than the layer's default, with a thin dark
+ * outline so a label holds up over a near-white raster (precipitation) as
+ * well as a dark one. The layer draws the letter at 1.2× `textSize` and the
+ * value at `textSize`; that ratio is not a prop.
+ */
+const HIGH_LOW = {
+  textSize: 16,
+  textColor: [255, 255, 255, 255] as [number, number, number, number],
+  textOutlineWidth: 1,
+  textOutlineColor: [0, 0, 0, 153] as [number, number, number, number],
 };
 
 const props = defineProps<{ config: ViewerConfig }>();
 const emit = defineEmits<{
-  /** Both textures of the current step have settled — the frame is as drawn as it will get. */
+  /** Every texture of the current step has settled — the frame is as drawn as it will get. */
   frameReady: [ready: boolean];
   rasterError: [message: string | null];
   windError: [message: string | null];
@@ -120,23 +129,28 @@ let overlay: MapLibreOverlay | null = null;
  * One texture under one URL: what is drawn, what it is a frame *of*, whether a
  * newer frame is in flight, and the last failure.
  */
-interface Slot {
+interface Slot<Shows = Frame> {
   texture: Ref<Texture | null>;
   /** What the drawn texture is a frame of, as `follow` was told when it landed. */
-  shows: Ref<Frame | null>;
+  shows: Ref<Shows | null>;
   pending: Ref<boolean>;
   error: Ref<string | null>;
 }
 
-function newSlot(shows: Ref<Frame | null> = shallowRef(null)): Slot {
+function newSlot<Shows = Frame>(shows: Ref<Shows | null> = shallowRef(null)): Slot<Shows> {
   return { texture: shallowRef(null), shows, pending: ref(false), error: ref(null) };
 }
 
 // The raster's frame is the store's, so the legend reads the same one.
 const raster = newSlot(viewer.frame);
 const wind = newSlot();
-/** The pressure variable's texture, which both isobars and highs/lows draw from. */
-const pressure = newSlot();
+/**
+ * The pressure variable's texture, which both isobars and highs/lows draw
+ * from, and the overlay it was fetched for: its interval and `to_hpa` are in
+ * that texture's unit, so they travel with it rather than being read off the
+ * selection, which may already name another model's.
+ */
+const pressure = newSlot<PressureOverlay>();
 
 function windLayers() {
   const current = wind.texture.value;
@@ -168,12 +182,12 @@ function windLayers() {
 /**
  * The pressure overlay, split around the wind: isobars go under the trails,
  * so lines and particles do not tangle, and the H/L labels go over them, so
- * no trail hides a centre. A slot whose overlay is no longer the selected
- * source's is drawn from until the next texture lands, like the others.
+ * no trail hides a centre. Both draw from one smoothed field, so every centre
+ * sits inside the lines around it.
  */
 function pressureLayers() {
   const current = pressure.texture.value;
-  const overlay = viewer.pressureToDraw.value;
+  const overlay = pressure.shows.value;
   if (!current || !overlay) return { isobars: [], highLow: [] };
   const settings = viewer.state.pressure;
   const common = {
@@ -181,6 +195,7 @@ function pressureLayers() {
     image: current.image,
     bounds: current.bounds,
     imageUnscale: current.unscale,
+    imageSmoothing: pressureSmoothing(current.bounds, current.image.height),
     pickable: false,
   };
   return {
@@ -190,7 +205,7 @@ function pressureLayers() {
             ...common,
             id: ISOBAR_LAYER_ID,
             interval: overlay.interval,
-            majorInterval: overlay.interval * ISOBARS.majorEvery,
+            majorInterval: overlay.interval,
             color: ISOBARS.color,
             width: ISOBARS.width,
           }),
@@ -203,6 +218,7 @@ function pressureLayers() {
             id: HIGH_LOW_LAYER_ID,
             radius: highLowRadiusKm(current.bounds),
             textFormatFunction: (value: number) => pressureLabel(value, overlay.to_hpa),
+            ...HIGH_LOW,
           }),
         ]
       : [],
@@ -244,7 +260,7 @@ function repaint() {
  * drawn. An empty URL clears the slot, which is how the wind toggle and a
  * model without a wind binding both take the particles off the map.
  */
-function follow(url: ComputedRef<string | null>, into: Slot, shows: () => Frame | null = () => null) {
+function follow<Shows>(url: ComputedRef<string | null>, into: Slot<Shows>, shows: () => Shows | null = () => null) {
   watch(
     url,
     async (next) => {
@@ -282,7 +298,7 @@ follow(viewer.textureUrl, raster, () =>
   selectedScalar.value ? { of: selectedScalar.value, parameter: viewer.parameter.value } : null,
 );
 follow(viewer.windTextureUrl, wind);
-follow(viewer.pressureTextureUrl, pressure);
+follow(viewer.pressureTextureUrl, pressure, () => viewer.pressureToDraw.value);
 
 // Pressure is gated like wind: while it is switched on, playback waits for the
 // isobars, so they are never a step behind the field under them. Switched off,

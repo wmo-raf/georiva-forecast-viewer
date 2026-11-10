@@ -35,12 +35,15 @@ const root = ref<HTMLElement | null>(null);
 const windAvailable = computed(() => viewer.windBinding.value !== null);
 const windOn = computed(() => viewer.state.wind.on && windAvailable.value);
 const settings = computed(() => viewer.state.wind);
+/** A toolbar button that opens a panel above the bar. */
+type Dropup = "wind" | "pressure";
+
 /** The dropup that is open, if any: one at a time, so they never stack over each other. */
-const open = ref<"wind" | "pressure" | null>(null);
+const open = ref<Dropup | null>(null);
 const windOpen = computed(() => open.value === "wind");
 const pressureOpen = computed(() => open.value === "pressure");
 
-function toggle(which: "wind" | "pressure") {
+function toggle(which: Dropup) {
   open.value = open.value === which ? null : which;
 }
 
@@ -59,7 +62,7 @@ watch(open, (current) => {
 
 // ---- pressure ----
 
-const pressureAvailable = computed(() => viewer.pressureBinding.value !== null);
+const pressureAvailable = computed(() => viewer.pressureOverlay.value !== null);
 const pressure = computed(() => viewer.state.pressure);
 const pressureOn = computed(() => pressureAvailable.value && (pressure.value.isobars || pressure.value.highLow));
 

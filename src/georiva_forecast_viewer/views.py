@@ -31,8 +31,7 @@ from .pyramid import is_rendered, pyramid_in
 logger = logging.getLogger(__name__)
 
 
-def describe_config(organisation):
-    settings = ForecastViewerSettings.for_site(organisation.site)
+def describe_config(organisation, settings):
     return {
         "org": organisation.slug,
         "org_name": organisation.name,
@@ -99,7 +98,7 @@ def describe_source(binding):
     return described
 
 
-def pressure_by_source(request, organisation):
+def pressure_by_source(request, settings):
     """Each visible source's pressure overlay, by source pk, for those that can draw one.
 
     A source is absent when it has no binding to the pressure quantity, or when
@@ -108,7 +107,6 @@ def pressure_by_source(request, organisation):
     binding already saved; the viewer then loses the overlay for that model
     rather than the whole catalogue failing, and the log says why.
     """
-    settings = ForecastViewerSettings.for_site(organisation.site)
     if settings.pressure_quantity_id is None:
         return {}
     overlays = {}
@@ -127,10 +125,10 @@ def pressure_by_source(request, organisation):
     return overlays
 
 
-def describe_quantities(request, organisation):
+def describe_quantities(request, settings):
     """Quantities in their order, each with its sources in theirs."""
     by_quantity = {}
-    pressure = pressure_by_source(request, organisation)
+    pressure = pressure_by_source(request, settings)
     for binding in visible_bindings(request).order_by(
         "quantity__order", "quantity__name", "source__order", "source__name"
     ):
@@ -160,8 +158,10 @@ class CatalogueView(APIView):
 
     def get(self, request):
         organisation = require_active_org(request)
+        # Read once: the config and the pressure overlays both come from it.
+        settings = ForecastViewerSettings.for_site(organisation.site)
         response = Response(
-            {"config": describe_config(organisation), "quantities": describe_quantities(request, organisation)}
+            {"config": describe_config(organisation, settings), "quantities": describe_quantities(request, settings)}
         )
         # Varies by audience at a URL that carries none (members see private
         # sources), so no cache between here and a browser may share it (ADR 0029).

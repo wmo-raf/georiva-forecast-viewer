@@ -35,20 +35,25 @@ export function edrCollectionUrl(source: Source): string {
  * address keeps the parameter order core's `addresses.py` writes.
  */
 function stepParams(
-  source: Source,
+  version: string,
   time: string,
   reftime: string | null,
   leading: Record<string, string> = {},
 ): URLSearchParams {
   const params = new URLSearchParams({ ...leading, time });
   if (reftime) params.set("reftime", reftime);
-  params.set("v", source.version);
+  params.set("v", version);
   return params;
 }
 
 /**
- * The value-encoded texture of one variable at one step (ADR 0021), carrying
- * the source's `version` as `v=` so the immutable reply is keyed by render config.
+ * The value-encoded texture of one variable at one step (ADR 0021), carrying a
+ * render-config token as `v=` so the immutable reply is keyed by render config.
+ *
+ * The token is the source listing's by default, which is the token of the
+ * variable that listing is for. A *different* variable of the same source —
+ * the pressure overlay's, drawn over whichever raster is selected — passes
+ * its own, or its texture would be cached against another variable's range.
  */
 export function encodedPreviewUrl(
   org: string,
@@ -56,8 +61,9 @@ export function encodedPreviewUrl(
   variable: string,
   time: string,
   reftime: string | null,
+  version: string = source.version,
 ): string {
-  const params = stepParams(source, time, reftime);
+  const params = stepParams(version, time, reftime);
   return `/titiler/${org}/${source.catalog}/${source.collection}/${variable}/encoded-preview.png?${params}`;
 }
 
@@ -74,6 +80,6 @@ export function vectorPreviewUrl(org: string, source: Source, time: string, reft
   if (!source.u || !source.v) {
     throw new Error(`${source.slug} has no u and v pair to build a vector texture from`);
   }
-  const params = stepParams(source, time, reftime, { u_variable: source.u, v_variable: source.v });
+  const params = stepParams(source.version, time, reftime, { u_variable: source.u, v_variable: source.v });
   return `/titiler/${org}/${source.catalog}/${source.collection}/vector-preview.png?${params}`;
 }

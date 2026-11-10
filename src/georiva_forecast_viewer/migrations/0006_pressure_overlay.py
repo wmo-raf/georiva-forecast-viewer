@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='forecastviewersettings',
             name='isobar_interval_hpa',
-            field=models.FloatField(default=4.0, help_text='Spacing between isobars; every fifth is drawn bolder.', validators=[django.core.validators.MinValueValidator(0.5)], verbose_name='Isobar interval (hPa)'),
+            field=models.FloatField(default=4.0, help_text='Spacing between isobars. 4 hPa is the synoptic convention; 2 hPa suits the tropics.', validators=[django.core.validators.MinValueValidator(0.5)], verbose_name='Isobar interval (hPa)'),
         ),
         migrations.AddField(
             model_name='forecastviewersettings',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memoryStorage } from "./memoryStorage";
+import { memoryStorage } from "../test-support/memoryStorage";
 import {
   DEFAULT_PRESSURE,
   STORAGE_KEY,

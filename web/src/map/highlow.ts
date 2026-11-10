@@ -36,6 +36,31 @@ export function highLowRadiusKm([west, south, east, north]: readonly [number, nu
   return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, radius));
 }
 
+/** The smoothed field's grid as a share of the H/L radius; tuned by eye against IFS and a WRF domain. */
+const RADII_PER_SMOOTHED_CELL = 15;
+
+/**
+ * The layers' `imageSmoothing` for the pressure texture: how many texture rows
+ * one smoothed cell spans, less one.
+ *
+ * The layers sample the texture as if it were `1 + smoothing` times coarser
+ * and interpolate cubically between those samples, which smooths away what is
+ * finer than the synoptic pattern — the 8-bit stair-steps and the rings mean
+ * sea level pressure makes over high ground. Isobars and highs/lows are given
+ * the same value, so every centre sits inside the lines drawn around it.
+ *
+ * The target scale follows the H/L radius, so it moves with the domain the
+ * same way: about 133 km for a global source, a few tens of kilometres for a
+ * regional one, which keeps a WRF domain's own detail rather than blurring it
+ * to a global model's.
+ */
+export function pressureSmoothing(bounds: readonly [number, number, number, number], heightPx: number): number {
+  if (heightPx <= 0) return 0;
+  const rowKm = ((bounds[3] - bounds[1]) * KM_PER_DEGREE) / heightPx;
+  const targetKm = highLowRadiusKm(bounds) / RADII_PER_SMOOTHED_CELL;
+  return Math.max(0, Math.round(targetKm / rowKm) - 1);
+}
+
 /**
  * A centre's value as a chart prints it: whole hectopascals, no unit.
  *

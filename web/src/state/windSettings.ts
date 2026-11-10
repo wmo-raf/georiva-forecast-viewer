@@ -11,7 +11,7 @@
  * reaching the particle layer as something it cannot draw.
  */
 
-import { browserStorage } from "./storage";
+import { browserStorage, loadRemembered, saveRemembered } from "./storage";
 
 /** A multiplier on the automatic particle budget (`map/particles.ts`), not a count. */
 export type Density = 0.5 | 1 | 2;
@@ -77,18 +77,9 @@ export function sanitize(raw: unknown): WindSettings {
 }
 
 export function loadWindSettings(storage: Storage | null = browserStorage()): WindSettings {
-  try {
-    const stored = storage?.getItem(STORAGE_KEY);
-    return sanitize(stored ? JSON.parse(stored) : null);
-  } catch {
-    return { ...DEFAULT_WIND };
-  }
+  return loadRemembered(STORAGE_KEY, sanitize, storage);
 }
 
 export function saveWindSettings(settings: WindSettings, storage: Storage | null = browserStorage()): void {
-  try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Full, blocked or private: the settings still hold for this visit.
-  }
+  saveRemembered(STORAGE_KEY, settings, storage);
 }
