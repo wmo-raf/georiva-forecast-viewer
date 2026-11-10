@@ -27,7 +27,7 @@
  * the browser has no Fullscreen API (Safari on iPhone) rather than shown as a
  * button that can never work.
  */
-import { ChevronUp, Gauge, Layers, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { ChevronUp, Cog, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
 import { BASEMAPS } from "../map/basemap";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useZoom } from "../map/zoom";
@@ -234,21 +234,27 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
-    <div v-if="basemapOpen" id="basemap-panel" class="dropup" role="radiogroup" aria-label="Basemap">
-      <span class="dropup__title dropup__heading">Basemap</span>
-      <label v-for="b in BASEMAPS" :key="b.name" class="dropup__switch-row dropup__switch-row--plain">
-        <span class="basemap__option">
-          <span class="basemap__swatch" :style="{ background: b.swatch }" aria-hidden="true"></span>
-          {{ b.label }}
-        </span>
-        <input
-          type="radio"
-          name="basemap"
-          :value="b.name"
-          :checked="viewer.basemap.value === b.name"
-          @change="viewer.setBasemap(b.name)"
-        />
-      </label>
+    <div v-if="basemapOpen" id="basemap-panel" class="dropup" role="group" aria-label="Map styles">
+      <span class="basemap__heading">Map styles</span>
+      <div class="basemap__cards" role="radiogroup" aria-label="Map styles">
+        <button
+          v-for="b in BASEMAPS"
+          :key="b.name"
+          type="button"
+          role="radio"
+          class="basemap__card"
+          :class="{ 'basemap__card--selected': viewer.basemap.value === b.name }"
+          :aria-checked="viewer.basemap.value === b.name"
+          @click="viewer.setBasemap(b.name)"
+        >
+          <span
+            class="basemap__swatch"
+            :style="{ background: `linear-gradient(135deg, ${b.land} 50%, ${b.water} 50%)` }"
+            aria-hidden="true"
+          ></span>
+          <span class="basemap__label">{{ b.label }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="tools__bar" role="toolbar" aria-label="Map tools">
@@ -321,7 +327,7 @@ onBeforeUnmount(() => {
         aria-controls="basemap-panel"
         @click="toggle('basemap')"
       >
-        <Layers :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <Cog :size="16" :stroke-width="1.75" aria-hidden="true" />
         <ChevronUp
           class="tools__caret"
           :class="{ 'tools__caret--open': basemapOpen }"

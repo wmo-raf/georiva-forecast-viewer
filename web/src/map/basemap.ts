@@ -273,10 +273,10 @@ const LIGHT: Palette = {
 
 const PALETTES: Record<BasemapName, Palette> = { grey: GREY, light: LIGHT };
 
-/** For the control: each basemap's name and its ground, as a swatch. */
-export const BASEMAPS: { name: BasemapName; label: string; swatch: string }[] = [
-  { name: "grey", label: "Grey", swatch: GREY.ground },
-  { name: "light", label: "Light", swatch: LIGHT.ground },
+/** For the control: each basemap's name, and its land and water for a swatch. */
+export const BASEMAPS: { name: BasemapName; label: string; land: string; water: string }[] = [
+  { name: "grey", label: "Grey", land: GREY.ground, water: GREY.water },
+  { name: "light", label: "Light", land: LIGHT.ground, water: LIGHT.water },
 ];
 
 
