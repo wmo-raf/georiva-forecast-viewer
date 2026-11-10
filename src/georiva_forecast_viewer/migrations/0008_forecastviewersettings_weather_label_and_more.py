@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='forecastviewersettings',
             name='weather_opens',
-            field=models.BooleanField(default=True, help_text='Open the viewer on the weather symbols rather than the first quantity, when a source has a weather symbols model.', verbose_name='Open on the Weather layer'),
+            field=models.BooleanField(default=True, help_text='Open the viewer on the weather symbols rather than the first quantity, when a source has a weather symbols model. It opens at the opening view above; set that to your country to land on your towns.', verbose_name='Open on the Weather layer'),
         ),
     ]

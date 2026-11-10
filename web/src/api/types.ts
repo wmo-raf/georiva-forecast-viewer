@@ -164,6 +164,8 @@ export interface PlacesTown {
 export interface PlacesMatrix {
   model: string;
   reference_time: string;
+  /** The area the towns were chosen from: west, south, east, north. */
+  bbox: [number, number, number, number];
   window: { duration: string };
   times: string[];
   units: Record<string, string>;

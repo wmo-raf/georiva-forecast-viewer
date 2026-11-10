@@ -7,10 +7,11 @@
  * only sequences the loads and keeps the latest answer.
  */
 
-import { computed, reactive, shallowRef, watch } from "vue";
+import { computed, reactive, ref, shallowRef, watch } from "vue";
 import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
 import { loadCatalogue, loadEdr, loadPlaces, loadRuns } from "../api/client";
 import type { Catalogue, EdrCollection, EdrParameter, PlacesMatrix, Quantity, Source } from "../api/types";
+import { extentOf, type Extent } from "../map/framing";
 import { symbolsAt } from "../map/symbols";
 import { drawnParameter, type Frame } from "./drawn";
 import { selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
@@ -253,6 +254,32 @@ const pressureTextureUrl = computed(() => {
   return encodedPreviewUrl(org, source.value, pressure.variable, time.value, run.value.reference_time, pressure.version);
 });
 
+/**
+ * What a switch frames (`map/framing.ts`): the Weather area while in Weather,
+ * the model's EDR extent otherwise — each only once it is the current
+ * selection's, so a switch never frames the model it left.
+ */
+const frameBounds = computed<Extent | null>(() => {
+  if (weather.value) return symbolsCurrent.value ? extentOf(state.symbolsMatrix?.bbox) : null;
+  if (!source.value || state.timelineFor !== keyOf(source.value) || !state.edr) return null;
+  return extentOf(state.edr.extent.spatial.bbox);
+});
+
+/**
+ * Counts the switches that ask to be framed: another model, and every entry
+ * into Weather. Not the opening selection — the viewer opens on the operator's
+ * view as set — and not a quantity switch on the same model.
+ */
+const frameRequests = ref(0);
+
+watch(
+  () => [source.value ? keyOf(source.value) : null, weather.value] as const,
+  ([key, inWeather], previous) => {
+    if (!previous || previous[0] === null) return;
+    if (key !== previous[0] || (inWeather && !previous[1])) frameRequests.value++;
+  },
+);
+
 /** The towns the map draws in Weather at the step on screen; null outside Weather. */
 const symbolsToDraw = computed(() =>
   weather.value && symbolsCurrent.value ? symbolsAt(state.symbolsMatrix, time.value) : null,
@@ -423,6 +450,8 @@ export function useViewer() {
     runChoices,
     selectedRun,
     symbolsToDraw,
+    frameBounds,
+    frameRequests,
     load,
     pickQuantity,
     pickSource,

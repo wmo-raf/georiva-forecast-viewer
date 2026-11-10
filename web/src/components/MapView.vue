@@ -76,6 +76,7 @@ import { placesWithValues, VALUED_CLASSES } from "../map/places";
 import { readValue } from "../map/sample";
 import { spokenFor } from "../map/symbols";
 import { loadTexture, type Texture } from "../map/texture";
+import { FIT_DURATION_MS, FIT_MAX_ZOOM, Framer, fitPadding, type Extent } from "../map/framing";
 import { serveWeatherIcons } from "../map/weatherIcons";
 import { attachMap } from "../map/zoom";
 import { useViewer } from "../state/store";
@@ -399,6 +400,51 @@ watch([viewer.symbolsToDraw, viewer.weather], () => {
   refreshPlaces();
 });
 
+/**
+ * Framing a switch (`map/framing.ts`): a request when the store counts one, a
+ * move — or none — once the new model's bounds are here, withdrawn if the user
+ * moves the map first.
+ */
+const framer = new Framer();
+const NARROW = "(max-width: 720px)";
+
+function viewExtent(): Extent | null {
+  if (!map) return null;
+  const b = map.getBounds();
+  return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+}
+
+function frame() {
+  const bounds = viewer.frameBounds.value;
+  const view = viewExtent();
+  if (!map || !bounds || !view) return;
+  const target = framer.arrived(view, bounds);
+  if (!target) return;
+  const rail = document.getElementById("layers-menu");
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  map.fitBounds(
+    [
+      [target[0], target[1]],
+      [target[2], target[3]],
+    ],
+    {
+      padding: fitPadding({
+        narrow: window.matchMedia?.(NARROW).matches ?? false,
+        railOpen: !!rail && rail.offsetParent !== null,
+      }),
+      maxZoom: FIT_MAX_ZOOM,
+      duration: reduced ? 0 : FIT_DURATION_MS,
+    },
+  );
+}
+
+watch(viewer.frameRequests, () => {
+  framer.request();
+  // Entering Weather on a model whose area is already loaded frames at once.
+  frame();
+});
+watch(viewer.frameBounds, frame);
+
 function readViewport() {
   if (!map) return;
   const bounds = map.getBounds();
@@ -420,6 +466,11 @@ onMounted(() => {
   // through `map/zoom.ts`.
   attachMap(map);
   serveWeatherIcons(map, drawSymbols);
+  // A gesture carries its DOM event; the toolbar's zoom says `byUser`. Our own
+  // framing carries neither, so it never cancels itself.
+  map.on("movestart", (event) => {
+    if (event.originalEvent || (event as { byUser?: boolean }).byUser) framer.userMoved();
+  });
   // On `moveend`, not `move`: the budget only moves in powers of two, and
   // resizing it mid-gesture would restart every trail (see `map/particles.ts`).
   map.on("moveend", () => {

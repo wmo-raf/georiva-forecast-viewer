@@ -6,6 +6,7 @@ import { formatTemperature, sortKey, spokenFor, symbolsAt, windArrow } from "./s
 const MATRIX: PlacesMatrix = {
   model: "ecmwf-ifs",
   reference_time: "2026-11-10T12:00:00Z",
+  bbox: [33.9, -4.7, 41.9, 5.1],
   window: { duration: "PT6H" },
   times: ["2026-11-10T15:00:00Z", "2026-11-10T18:00:00Z"],
   units: { air_temperature: "celsius", wind_speed: "m/s", precipitation_amount: "mm" },
