@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlacesMatrix } from "../api/types";
-import { formatTemperature, sortKey, spokenFor, symbolsAt, symbolsAvailability, windArrow } from "./symbols";
+import { formatTemperature, sortKey, spokenFor, symbolsAt, windArrow } from "./symbols";
 
 /** Two towns over two 6-hourly windows, as `/api/forecast/{model}/places/` returns them. */
 const MATRIX: PlacesMatrix = {
@@ -120,46 +120,6 @@ describe("symbolsAt", () => {
   it("is empty at a time the matrix does not answer", () => {
     expect(symbolsAt(MATRIX, "2026-11-10T09:00:00Z").features).toEqual([]);
     expect(symbolsAt(MATRIX, null).features).toEqual([]);
-  });
-});
-
-describe("symbolsAvailability", () => {
-  const RUN = "2026-11-10T12:00:00Z";
-
-  it("is off for a source with no symbols model", () => {
-    expect(symbolsAvailability({ model: "", run: RUN, matrix: null, loading: false, failed: false })).toEqual({
-      state: "none",
-    });
-  });
-
-  it("is loading while the matrix is on its way", () => {
-    expect(
-      symbolsAvailability({ model: "ecmwf-ifs", run: RUN, matrix: null, loading: true, failed: false }).state,
-    ).toBe("loading");
-  });
-
-  it("is ready when the selected run is the one the symbols were built from", () => {
-    expect(
-      symbolsAvailability({ model: "ecmwf-ifs", run: "2026-11-10T12:00:00+00:00", matrix: MATRIX, loading: false, failed: false }),
-    ).toEqual({ state: "ready" });
-  });
-
-  it("names the run it has when another run is selected", () => {
-    expect(
-      symbolsAvailability({ model: "ecmwf-ifs", run: "2026-11-10T00:00:00Z", matrix: MATRIX, loading: false, failed: false }),
-    ).toEqual({ state: "other-run", run: "2026-11-10T12:00:00Z" });
-  });
-
-  it("is unavailable when the matrix could not be loaded", () => {
-    expect(
-      symbolsAvailability({ model: "ecmwf-ifs", run: RUN, matrix: null, loading: false, failed: true }).state,
-    ).toBe("unavailable");
-  });
-
-  it("ignores a matrix of another model", () => {
-    expect(
-      symbolsAvailability({ model: "kmsa-nwp", run: RUN, matrix: MATRIX, loading: false, failed: false }).state,
-    ).toBe("loading");
   });
 });
 

@@ -4,6 +4,29 @@
 export interface Catalogue {
   config: ViewerConfig;
   quantities: Quantity[];
+  weather: WeatherLayer;
+}
+
+/**
+ * The Weather layer: Yr symbols over the towns and nothing else. Not a
+ * quantity — configured in the viewer's settings, and drawn by the sources
+ * that name a symbols model, listed here in source order.
+ */
+export interface WeatherLayer {
+  /** What the rail calls it: the operator's words, "Weather" by default. */
+  label: string;
+  /** Open the viewer on it, when any source can draw it. */
+  opens: boolean;
+  sources: WeatherSource[];
+}
+
+export interface WeatherSource {
+  slug: string;
+  name: string;
+  descriptor: string;
+  catalog: string;
+  collection: string;
+  symbols_model: string;
 }
 
 export interface ViewerConfig {
@@ -19,7 +42,8 @@ export interface ViewerConfig {
   shore_shadow: boolean;
 }
 
-export type QuantityKind = "scalar" | "vector";
+/** `weather` is the viewer's own rail entry (`state/weather.ts`), never one from the catalogue. */
+export type QuantityKind = "scalar" | "vector" | "weather";
 
 export interface Quantity {
   slug: string;

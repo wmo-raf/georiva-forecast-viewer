@@ -11,10 +11,11 @@ import { computed, reactive, shallowRef, watch } from "vue";
 import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
 import { loadCatalogue, loadEdr, loadPlaces, loadRuns } from "../api/client";
 import type { Catalogue, EdrCollection, EdrParameter, PlacesMatrix, Quantity, Source } from "../api/types";
-import { symbolsAt, symbolsAvailability } from "../map/symbols";
+import { symbolsAt } from "../map/symbols";
 import { drawnParameter, type Frame } from "./drawn";
-import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
-import { buildTimeline, stepIndex, type Timeline } from "./timeline";
+import { selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
+import { buildTimeline, stepIndex, type Timeline, type TimelineRun } from "./timeline";
+import { isWeather, nearestStep, openingSelection, railView } from "./weather";
 import {
   loadPressureSettings,
   pressureWanted,
@@ -22,7 +23,6 @@ import {
   type PressureSettings,
 } from "./pressureSettings";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
-import { loadSymbolsSettings, saveSymbolsSettings, type SymbolsSettings } from "./symbolsSettings";
 
 export type Status = "loading" | "ready" | "empty" | "error";
 
@@ -51,9 +51,7 @@ interface State {
    * pressure binding.
    */
   pressure: PressureSettings;
-  /** Whether the weather symbols are switched on, remembered between visits. */
-  symbols: SymbolsSettings;
-  /** The selected source's symbols model's town forecasts, once loaded. */
+  /** In the Weather layer: the selected source's symbols model's town forecasts, once loaded. */
   symbolsMatrix: PlacesMatrix | null;
   symbolsLoading: boolean;
   symbolsFailed: boolean;
@@ -72,7 +70,6 @@ const state = reactive<State>({
   playing: false,
   wind: loadWindSettings(),
   pressure: loadPressureSettings(),
-  symbols: loadSymbolsSettings(),
   symbolsMatrix: null,
   symbolsLoading: false,
   symbolsFailed: false,
@@ -88,24 +85,16 @@ watch(
   (settings) => savePressureSettings(settings),
 );
 
-watch(
-  () => ({ ...state.symbols }),
-  (settings) => saveSymbolsSettings(settings),
-);
 
 /** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
 const keyOf = (source: Source) => `${source.catalog}/${source.collection}`;
 
 /**
- * The map shows one scalar quantity as the raster, with wind and the pressure
- * overlay drawn over it. So the list a user picks from is the scalar
- * quantities, and the selection rules run over that view of the catalogue.
+ * What the rail offers and the selection rules run over: the Weather layer
+ * first when a source can draw it, then the scalar quantities — each drawn as
+ * the raster, with wind and the pressure overlay over it (`state/weather.ts`).
  */
-const scalarView = computed<Catalogue | null>(() =>
-  state.catalogue
-    ? { ...state.catalogue, quantities: state.catalogue.quantities.filter((q) => q.kind === "scalar") }
-    : null,
-);
+const scalarView = computed<Catalogue | null>(() => (state.catalogue ? railView(state.catalogue) : null));
 
 const scalarQuantities = computed(() => scalarView.value?.quantities ?? []);
 
@@ -118,10 +107,13 @@ const source = computed<Source | undefined>(() =>
   scalarView.value && state.selection ? sourceOf(scalarView.value, state.selection) : undefined,
 );
 
-/** The selected source's wind binding, if the catalogue has a vector quantity bound to it. */
+/** The Weather layer is on the map: symbols, and nothing else. */
+const weather = computed(() => isWeather(state.selection?.quantity));
+
+/** The selected source's wind binding, if the catalogue has a vector quantity bound to it. None in Weather. */
 const windBinding = computed<Source | null>(() => {
   const slug = state.selection?.source;
-  if (!slug || !state.catalogue) return null;
+  if (!slug || !state.catalogue || weather.value) return null;
   for (const quantity of state.catalogue.quantities) {
     if (quantity.kind !== "vector") continue;
     const bound = quantity.sources.find((s) => s.slug === slug);
@@ -138,29 +130,57 @@ const windToDraw = computed<Source | null>(() => (state.wind.on ? windBinding.va
  * this source binds it. Every listing of a source carries it, so the selected
  * scalar's listing is enough.
  */
-const pressureOverlay = computed(() => source.value?.pressure ?? null);
+const pressureOverlay = computed(() => (weather.value ? null : (source.value?.pressure ?? null)));
 
 /** The overlay the map should fetch: something is switched on and the source has one. Null otherwise. */
 const pressureToDraw = computed(() => (pressureWanted(state.pressure) ? pressureOverlay.value : null));
 
-/** False from the moment the source changes until its own timeline has landed. */
-const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
+/** The Forti model the selected Weather source's symbols come from; blank outside Weather. */
+const symbolsModel = computed(() => (weather.value ? (source.value?.symbols_model ?? "") : ""));
+
+/** The loaded symbols are the selected Weather source's. */
+const symbolsCurrent = computed(() => !!symbolsModel.value && state.symbolsMatrix?.model === symbolsModel.value);
+
+/**
+ * False from the moment the source changes until its own timeline has landed.
+ * In Weather the timeline *is* the symbols': the run and times Forti answered for.
+ */
+const timelineCurrent = computed(() =>
+  weather.value ? symbolsCurrent.value : !!source.value && state.timelineFor === keyOf(source.value),
+);
 
 /**
  * Something the frame is waiting for is on its way: the catalogue, or the
  * selected source's runs and EDR description. The pieces that need it stand in
  * as skeletons at their final size meanwhile, so nothing moves when it lands.
  */
+const failed = computed(() => (weather.value ? state.symbolsFailed : !!state.sourceError));
+
 const loading = computed(
-  () => state.status === "loading" || (!!source.value && !timelineCurrent.value && !state.sourceError),
+  () => state.status === "loading" || (!!source.value && !timelineCurrent.value && !failed.value),
 );
 
 /** The source's load failed and nothing is coming: skeletons stay, but stop promising. */
-const stalled = computed(() => !!state.sourceError && !timelineCurrent.value);
+const stalled = computed(() => failed.value && !timelineCurrent.value);
+
+/**
+ * The runs the run picker offers. In Weather, one: the run the symbols were
+ * built from — Forti holds a model's latest alone — so the pill reads it and
+ * offers no choice.
+ */
+const runChoices = computed<TimelineRun[]>(() => {
+  if (!weather.value) return state.timeline?.runs ?? [];
+  const matrix = state.symbolsMatrix;
+  return matrix && symbolsCurrent.value ? [{ reference_time: matrix.reference_time, valid_times: matrix.times }] : [];
+});
+
+const selectedRun = computed(() =>
+  weather.value ? (runChoices.value[0]?.reference_time ?? "") : (state.timeline?.selected ?? ""),
+);
 
 const run = computed(() => {
   if (!timelineCurrent.value) return null;
-  return state.timeline?.runs.find((r) => r.reference_time === state.timeline?.selected) ?? null;
+  return runChoices.value.find((r) => r.reference_time === selectedRun.value) ?? null;
 });
 
 const times = computed(() => run.value?.valid_times ?? []);
@@ -233,36 +253,12 @@ const pressureTextureUrl = computed(() => {
   return encodedPreviewUrl(org, source.value, pressure.variable, time.value, run.value.reference_time, pressure.version);
 });
 
-/** The Forti model the selected source's symbols come from; blank for none. */
-const symbolsModel = computed(() => source.value?.symbols_model ?? "");
-
-/** Whether the symbols may be drawn over the selected run, and if not, why not. */
-const symbols = computed(() =>
-  symbolsAvailability({
-    model: symbolsModel.value,
-    run: run.value?.reference_time ?? null,
-    matrix: state.symbolsMatrix,
-    loading: state.symbolsLoading,
-    failed: state.symbolsFailed,
-  }),
+/** The towns the map draws in Weather at the step on screen; null outside Weather. */
+const symbolsToDraw = computed(() =>
+  weather.value && symbolsCurrent.value ? symbolsAt(state.symbolsMatrix, time.value) : null,
 );
 
-/**
- * The towns the map should draw symbols for at the step on screen, or null
- * when no symbols are drawn — switched off, none for this source, another run
- * selected — in which case the basemap's own place names stay up.
- */
-const symbolsToDraw = computed(() => {
-  if (!state.symbols.on || symbols.value.state !== "ready") return null;
-  const collection = symbolsAt(state.symbolsMatrix, time.value);
-  return collection.features.length ? collection : null;
-});
-
-/**
- * Load the symbols model's town forecasts: once per model, and again whenever
- * the source's runs are reloaded, which is when a newer run may have arrived.
- * An answer for a model the user has since left is dropped.
- */
+/** Load a Weather source's town forecasts. An answer for a model the user has since left is dropped. */
 async function loadSymbols(model: string) {
   state.symbolsLoading = true;
   state.symbolsFailed = false;
@@ -277,23 +273,37 @@ async function loadSymbols(model: string) {
   }
 }
 
+// Every entry into Weather asks again — a newer run may have been published
+// since — and so does a switch to another Weather source. The route answers
+// from its cache (or a 304), so the ask is cheap.
 watch(
-  () => [symbolsModel.value, state.symbols.on, state.timelineFor] as const,
-  ([model, on], previous) => {
-    if (!model || !on) return;
-    const sameModel = previous?.[0] === model && state.symbolsMatrix?.model === model;
-    // Switching on again, or a quantity switch within the source, keeps what is loaded.
-    if (sameModel && previous?.[2] === state.timelineFor) return;
-    void loadSymbols(model);
+  symbolsModel,
+  (model) => {
+    if (model) void loadSymbols(model);
   },
   { immediate: true },
 );
+
+/**
+ * The moment on screen when the user last switched between Weather and a
+ * raster: their timelines differ, so the step is found again in the new one
+ * (`nearestStep`) once it is there, rather than reset to its start.
+ */
+let carried: string | null = null;
+
+watch(times, (next) => {
+  if (carried === null || next.length === 0) return;
+  state.step = nearestStep(next, carried);
+  carried = null;
+});
 
 async function load() {
   state.status = "loading";
   try {
     state.catalogue = await loadCatalogue();
-    state.selection = scalarView.value ? initialSelection(scalarView.value) : null;
+    state.selection = scalarView.value
+      ? openingSelection(scalarView.value, state.catalogue.weather?.opens ?? false)
+      : null;
     state.status = state.selection ? "ready" : "empty";
   } catch (error) {
     state.status = "error";
@@ -314,7 +324,9 @@ async function loadSource(current: Source) {
     state.edr = edr;
     state.timeline = buildTimeline(runs, edr);
     state.timelineFor = keyOf(current);
-    state.step = 0;
+    // In Weather this is the raster timeline loading behind the symbols, for
+    // the switch back; the step on screen is Weather's and stays.
+    if (!weather.value) state.step = 0;
     state.sourceError = null;
   } catch (error) {
     if (stillWanted()) state.sourceError = String(error);
@@ -334,7 +346,12 @@ watch(
 );
 
 function pickQuantity(slug: string) {
-  if (scalarView.value && state.selection) state.selection = selectQuantity(scalarView.value, state.selection, slug);
+  if (!scalarView.value || !state.selection) return;
+  if (isWeather(slug) !== weather.value) {
+    carried = time.value;
+    state.playing = false;
+  }
+  state.selection = selectQuantity(scalarView.value, state.selection, slug);
 }
 
 function pickSource(slug: string) {
@@ -356,33 +373,12 @@ function setPressure(changes: Partial<PressureSettings>) {
 }
 
 function pickRun(referenceTime: string) {
+  // In Weather there is one run, the symbols', and nothing to pick.
+  if (weather.value) return;
   if (state.timeline?.runs.some((r) => r.reference_time === referenceTime)) {
     state.timeline.selected = referenceTime;
     state.step = 0;
   }
-}
-
-function setSymbols(on: boolean) {
-  state.symbols.on = on;
-}
-
-/**
- * The run the symbols were built from, as the timeline lists it — when another
- * run is selected and the timeline has that one. What "Show that run" offers;
- * absent, there is nothing to offer, and no button.
- */
-const symbolsRun = computed(() => {
-  const current = symbols.value;
-  if (current.state !== "other-run") return null;
-  const wanted = Date.parse(current.run);
-  return state.timeline?.runs.find((r) => Date.parse(r.reference_time) === wanted) ?? null;
-});
-
-const symbolsRunListed = computed(() => symbolsRun.value !== null);
-
-/** Select the run the symbols were built from. */
-function showSymbolsRun() {
-  if (symbolsRun.value) pickRun(symbolsRun.value.reference_time);
 }
 
 function step(delta: number) {
@@ -423,10 +419,10 @@ export function useViewer() {
     textureUrl,
     windTextureUrl,
     pressureTextureUrl,
-    symbolsModel,
-    symbols,
+    weather,
+    runChoices,
+    selectedRun,
     symbolsToDraw,
-    symbolsRunListed,
     load,
     pickQuantity,
     pickSource,
@@ -437,7 +433,5 @@ export function useViewer() {
     setWind,
     resetWind,
     setPressure,
-    setSymbols,
-    showSymbolsRun,
   };
 }

@@ -29,8 +29,10 @@ const bar = computed(() =>
 <template>
   <!-- The slot is always there, at the legend's height, so the picker and the
        toolbar standing on it never move: a skeleton while the description is
-       on its way, empty when the quantity has no palette to show. -->
-  <div v-if="bar" class="legend">
+       on its way, empty when the quantity has no palette to show — and empty
+       in Weather, which has no colour scale. -->
+  <div v-if="viewer.weather.value" class="legend legend--none" aria-hidden="true"></div>
+  <div v-else-if="bar" class="legend">
     <span class="legend__unit" v-if="unit">{{ unit }}</span>
 
     <!-- A classification: one block per class, its lower boundary on it. -->

@@ -41,13 +41,12 @@
  * a quantity switch keeps the old frame up until the new one lands, and its
  * numbers must not sit under the new legend meanwhile.
  *
- * While weather symbols are drawn (`state.symbolsToDraw`), each town of the
- * symbols model shows its Yr icon, temperature and wind for the step on
- * screen, and carries its own name: the basemap's name for the same place
- * gives way (`spokenFor`), and every other basemap name stays — a country with
- * no imported towns keeps all of its own. When there are none to draw —
- * switched off, another run selected, a step before the symbols begin — the
- * basemap's names come back in full.
+ * The Weather layer draws nothing of the above: no raster, no wind, no
+ * pressure — the store gives none of them a URL there. It draws the symbols
+ * model's towns instead (`state.symbolsToDraw`), each with its Yr icon,
+ * temperature and wind for the step on screen and its own name: the basemap's
+ * name for the same place gives way (`spokenFor`), and every other basemap
+ * name stays, so a country with no imported towns keeps all of its own.
  */
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 // MapLibre 6 is ESM-only and has no default export, so the namespace import.
@@ -63,7 +62,13 @@ import { ContourLayer, HighLowLayer, ImageType, ParticleLayer, RasterLayer } fro
 import type { PressureOverlay, ViewerConfig } from "../api/types";
 import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
-import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, WEATHER_SYMBOLS_SOURCE_ID, greyBasemap } from "../map/basemap";
+import {
+  DATA_ANCHOR_ID,
+  PLACES_SOURCE_ID,
+  WEATHER_SYMBOLS_LAYER_ID,
+  WEATHER_SYMBOLS_SOURCE_ID,
+  greyBasemap,
+} from "../map/basemap";
 import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
 import { isobarPalette } from "../map/isobars";
 import { particleCount, type Bounds } from "../map/particles";
@@ -377,13 +382,19 @@ watch([raster.texture, raster.shows, selectedScalar, () => viewer.quantity.value
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
 
-/** Put the step's symbols on the map, or take them off. */
+/**
+ * Put the step's symbols on the map, or take them off. The layer is hidden
+ * outside Weather rather than merely emptied, so its source — and the icons'
+ * credit with it — leaves the attribution too.
+ */
 function drawSymbols() {
-  map?.getSource<GeoJSONSource>(WEATHER_SYMBOLS_SOURCE_ID)?.setData(viewer.symbolsToDraw.value ?? EMPTY);
+  if (!map?.getLayer(WEATHER_SYMBOLS_LAYER_ID)) return;
+  map.getSource<GeoJSONSource>(WEATHER_SYMBOLS_SOURCE_ID)?.setData(viewer.symbolsToDraw.value ?? EMPTY);
+  map.setLayoutProperty(WEATHER_SYMBOLS_LAYER_ID, "visibility", viewer.weather.value ? "visible" : "none");
 }
 
 // The names follow too: the basemap's own give way only where a town is drawn.
-watch(viewer.symbolsToDraw, () => {
+watch([viewer.symbolsToDraw, viewer.weather], () => {
   drawSymbols();
   refreshPlaces();
 });

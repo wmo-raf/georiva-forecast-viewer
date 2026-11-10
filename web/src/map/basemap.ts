@@ -69,6 +69,16 @@ export const PLACES_SOURCE_ID = "places";
 export const WEATHER_SYMBOLS_SOURCE_ID = "weather-symbols";
 export const WEATHER_SYMBOLS_LAYER_ID = "weather-symbols";
 
+/**
+ * NRK's icons are CC BY 4.0, so the credit is on the map whenever they are.
+ * On the source rather than in a fixed control: MapLibre credits only the
+ * sources a visible layer reads, and the symbols layer is visible only in
+ * Weather (`MapView.vue`).
+ */
+const WEATHER_SYMBOLS_CREDIT =
+  'Weather symbols © <a href="https://nrkno.github.io/yr-weather-symbols/" target="_blank" rel="noopener">Yr/NRK</a>, ' +
+  '<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>';
+
 const OPENFREEMAP = "https://tiles.openfreemap.org";
 
 /**
@@ -715,6 +725,8 @@ const weatherSymbols: LayerSpecification = {
   type: "symbol",
   source: WEATHER_SYMBOLS_SOURCE_ID,
   layout: {
+    // Shown by the map only in the Weather layer, which also brings its credit.
+    visibility: "none",
     "icon-image": ["case", ["has", "symbol"], ["concat", ICON_PREFIX, ["get", "symbol"]], ""],
     "icon-anchor": "bottom",
     "text-anchor": "top",
@@ -763,7 +775,11 @@ export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } =
     sources: {
       openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
       [PLACES_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-      [WEATHER_SYMBOLS_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      [WEATHER_SYMBOLS_SOURCE_ID]: {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+        attribution: WEATHER_SYMBOLS_CREDIT,
+      },
       ...(shoreShadow
         ? {
             "shore-shadow": {

@@ -7,6 +7,7 @@ const wrf = { slug: "wrf", name: "KMD WRF", catalog: "models", collection: "wrf-
 
 const catalogue: Catalogue = {
   config: { org: "kmd", org_name: "KMD", default_view: { center: [20, 0], zoom: 3 }, shore_shadow: false },
+  weather: { label: "Weather", opens: false, sources: [] },
   quantities: [
     {
       slug: "t2m",

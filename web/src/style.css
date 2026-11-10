@@ -307,6 +307,12 @@ button {
 }
 
 /* The skeleton rows are rows' size and nothing more: not a target. */
+.rail__separator {
+  margin: 4px 8px;
+  border: 0;
+  border-top: 1px solid var(--fv-border);
+}
+
 .rail__item--skel {
   cursor: default;
 }
@@ -612,13 +618,6 @@ button {
   padding-bottom: 2px;
 }
 
-.dropup__note {
-  margin: 8px 0 0;
-  color: var(--fv-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .wind__settings {
   border: 0;
   margin: 0;
@@ -691,8 +690,7 @@ button {
   cursor: default;
 }
 
-.wind__reset,
-.dropup__link {
+.wind__reset {
   display: block;
   margin: 12px 0 0 auto;
   padding: 2px 0;
@@ -704,8 +702,7 @@ button {
   cursor: pointer;
 }
 
-.wind__reset:hover,
-.dropup__link:hover {
+.wind__reset:hover {
   text-decoration: underline;
 }
 

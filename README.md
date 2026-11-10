@@ -40,9 +40,8 @@ GeoRiva's process and talks to it over public HTTP routes only.
 - **Source** — one model the viewer can show: one collection, with a name, a
   short descriptor ("9 km") and an order. Owned through its collection.
   Optionally a **weather symbols model**: the slug of a `georiva-publisher-forti`
-  model whose town forecasts (`/api/forecast/<model>/places/`) the map draws as
-  Yr symbols over the towns — icon, temperature, wind. Symbols are drawn only
-  over the run that model last published; the toolbar switch starts on.
+  model whose town forecasts (`/api/forecast/<model>/places/`) the Weather layer
+  draws.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
@@ -63,6 +62,13 @@ GeoRiva's process and talks to it over public HTTP routes only.
   be stored in a pressure unit — the setting and the binding both refuse one
   that is not. Users switch isobars and highs/lows on from the toolbar; both
   start off.
+
+- **Weather layer** — Yr weather symbols over the towns (NRK's icons, CC BY 4.0,
+  credited on the map) and nothing else: no raster, no wind, no pressure. Not a
+  quantity: it is always first in the rail, set apart by a rule, whenever a
+  visible source has a weather symbols model, and it steps through that model's
+  latest run alone. Its name ("Weather" by default) and whether the viewer opens
+  on it (yes by default) are settings.
 
 Admin: *Forecast viewer → Quantities / Sources* (bindings inline on a source),
 and *Settings → Forecast viewer settings*.
@@ -101,7 +107,10 @@ whose unit stops being a pressure after it was bound (a unit is core's to edit)
 drops the overlay for that source with a logged warning; the route still
 answers.
 
-`symbols_model` is on every source, blank when none is set. It is the
+`weather` carries the layer's `label`, whether it `opens` the viewer, and its
+`sources` — the visible sources with a symbols model, in source order, each
+with `slug`, `name`, `descriptor`, `catalog`, `collection` and `symbols_model`.
+`symbols_model` is also on every source listing, blank when none is set. It is the
 operator's word, not discovered: Forti does not say which collection a model is
 published from, so the viewer is told.
 

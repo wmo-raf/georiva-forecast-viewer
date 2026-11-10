@@ -15,6 +15,9 @@
  * so a step still moving underneath would only be thrown away. From the
  * keyboard it is a listbox: the arrows move, Enter picks, Escape closes, and
  * focus goes back to the pill.
+ *
+ * In the Weather layer there is one run, the one the symbols were built from,
+ * so the pill reads it and offers nothing.
  */
 import { ChevronDown } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
@@ -23,8 +26,8 @@ import { useViewer } from "../state/store";
 
 const viewer = useViewer();
 
-const runs = computed(() => viewer.state.timeline?.runs ?? []);
-const selected = computed(() => viewer.state.timeline?.selected ?? "");
+const runs = computed(() => viewer.runChoices.value);
+const selected = computed(() => viewer.selectedRun.value);
 const choosable = computed(() => runs.value.length > 1);
 
 const root = ref<HTMLElement | null>(null);

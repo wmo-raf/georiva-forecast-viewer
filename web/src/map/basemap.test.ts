@@ -279,6 +279,15 @@ describe("without the shore shadow", () => {
 });
 
 describe("the weather symbols", () => {
+  /** CC BY 4.0 asks for the credit wherever the icons are shown, and only then is it true. */
+  it("credit Yr/NRK on their own source, and start hidden until Weather is chosen", () => {
+    const source = GREY_BASEMAP.sources[WEATHER_SYMBOLS_SOURCE_ID] as { attribution?: string };
+    expect(source.attribution).toContain("Yr/NRK");
+    expect(source.attribution).toContain("CC BY 4.0");
+    const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { layout?: Record<string, unknown> };
+    expect(layer.layout?.visibility).toBe("none");
+  });
+
   it("draw over every other name, from their own source", () => {
     const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { source?: string };
     expect(layer.source).toBe(WEATHER_SYMBOLS_SOURCE_ID);

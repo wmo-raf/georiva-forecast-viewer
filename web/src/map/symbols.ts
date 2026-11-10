@@ -9,10 +9,9 @@
  * symbol and hide together in a collision — a town never loses its name but
  * keeps its icon. Eight directions is what Yr itself shows.
  *
- * Symbols are only ever drawn for the run they were built from. Forti holds a
- * model's latest run alone, and a symbol from one run over a field from
- * another would say something neither forecast does — so a mismatch is
- * reported (`symbolsAvailability`), not papered over.
+ * They are the Weather layer's whole map (`state/weather.ts`): no raster, wind
+ * or pressure under them, and their own timeline — the run and the times Forti
+ * answered for — so a symbol never sits over a field from another forecast.
  */
 
 import type { Feature, FeatureCollection, Point } from "geojson";
@@ -79,38 +78,6 @@ export function symbolsAt(matrix: PlacesMatrix | null, time: string | null): Fea
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: town.coordinates }, properties });
   });
   return { type: "FeatureCollection", features };
-}
-
-export type SymbolsAvailability =
-  /** The selected source has no symbols model. */
-  | { state: "none" }
-  | { state: "loading" }
-  | { state: "ready" }
-  /** The symbols are of another run: the one named, the model's latest. */
-  | { state: "other-run"; run: string }
-  | { state: "unavailable" };
-
-/** Whether the symbols may be drawn over the selected run, and if not, why not. */
-export function symbolsAvailability({
-  model,
-  run,
-  matrix,
-  loading,
-  failed,
-}: {
-  /** The selected source's symbols model; blank for none. */
-  model: string;
-  /** The selected run's reference time. */
-  run: string | null;
-  matrix: PlacesMatrix | null;
-  loading: boolean;
-  failed: boolean;
-}): SymbolsAvailability {
-  if (!model) return { state: "none" };
-  if (failed) return { state: "unavailable" };
-  if (loading || !matrix || matrix.model !== model) return { state: "loading" };
-  if (run !== null && Date.parse(run) === Date.parse(matrix.reference_time)) return { state: "ready" };
-  return { state: "other-run", run: matrix.reference_time };
 }
 
 /**
