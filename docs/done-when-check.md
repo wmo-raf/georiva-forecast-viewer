@@ -317,3 +317,11 @@ reason not to treat it as a reference beyond the shore: at z7 and z8 most of
 its ink is **rivers and administrative lines**, not a shore shadow. An inland
 z8 tile over northern India is a dense web of them. Ours is empty there, which
 is what a shore shadow should be.
+
+## Since this walk — 2026-11-10, a second basemap
+
+The style in `web/src/map/basemap.ts` now has two palettes, **Grey** and
+**Light**, over the same layers and the same sources: a switch recolours the
+live map (`restyle`) and never loads another style. Light adds no host — the
+same OpenFreeMap tiles and fonts, still no sprite — so §2's list of addresses
+is unchanged, and neither palette can be replaced by an organisation.

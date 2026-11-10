@@ -24,6 +24,8 @@ import {
   type PressureSettings,
 } from "./pressureSettings";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
+import type { BasemapName } from "../map/basemap";
+import { basemapFor, loadBasemaps, saveBasemaps, type BasemapChoice } from "./basemapChoice";
 
 export type Status = "loading" | "ready" | "empty" | "error";
 
@@ -52,6 +54,8 @@ interface State {
    * pressure binding.
    */
   pressure: PressureSettings;
+  /** The basemap each kind of layer shows, from the toolbar and remembered (`basemapChoice.ts`). */
+  basemaps: BasemapChoice;
   /** In the Weather layer: the selected source's symbols model's town forecasts, once loaded. */
   symbolsMatrix: PlacesMatrix | null;
   symbolsLoading: boolean;
@@ -71,6 +75,7 @@ const state = reactive<State>({
   playing: false,
   wind: loadWindSettings(),
   pressure: loadPressureSettings(),
+  basemaps: loadBasemaps(),
   symbolsMatrix: null,
   symbolsLoading: false,
   symbolsFailed: false,
@@ -84,6 +89,11 @@ watch(
 watch(
   () => ({ ...state.pressure }),
   (settings) => savePressureSettings(settings),
+);
+
+watch(
+  () => ({ ...state.basemaps }),
+  (choice) => saveBasemaps(choice),
 );
 
 
@@ -110,6 +120,9 @@ const source = computed<Source | undefined>(() =>
 
 /** The Weather layer is on the map: symbols, and nothing else. */
 const weather = computed(() => isWeather(state.selection?.quantity));
+
+/** The basemap under the layer on screen: Weather's choice or the rasters'. */
+const basemap = computed<BasemapName>(() => basemapFor(state.basemaps, weather.value));
 
 /** The selected source's wind binding, if the catalogue has a vector quantity bound to it. None in Weather. */
 const windBinding = computed<Source | null>(() => {
@@ -394,6 +407,11 @@ function resetWind() {
   state.wind = { ...DEFAULT_WIND };
 }
 
+/** Pick the basemap for the kind of layer on screen; the other kind keeps its own. */
+function setBasemap(name: BasemapName) {
+  state.basemaps[weather.value ? "weather" : "raster"] = name;
+}
+
 /** Changes some of the pressure switches. */
 function setPressure(changes: Partial<PressureSettings>) {
   Object.assign(state.pressure, changes);
@@ -447,6 +465,7 @@ export function useViewer() {
     windTextureUrl,
     pressureTextureUrl,
     weather,
+    basemap,
     runChoices,
     selectedRun,
     symbolsToDraw,
@@ -462,5 +481,6 @@ export function useViewer() {
     setWind,
     resetWind,
     setPressure,
+    setBasemap,
   };
 }

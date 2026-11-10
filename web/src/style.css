@@ -618,6 +618,19 @@ button {
   padding-bottom: 2px;
 }
 
+.basemap__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.basemap__swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--fv-border);
+}
+
 .wind__settings {
   border: 0;
   margin: 0;

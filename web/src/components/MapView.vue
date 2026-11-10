@@ -67,7 +67,8 @@ import {
   PLACES_SOURCE_ID,
   WEATHER_SYMBOLS_LAYER_ID,
   WEATHER_SYMBOLS_SOURCE_ID,
-  greyBasemap,
+  restyle,
+  viewerBasemap,
 } from "../map/basemap";
 import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
 import { isobarPalette } from "../map/isobars";
@@ -401,6 +402,36 @@ watch([viewer.symbolsToDraw, viewer.weather], () => {
 });
 
 /**
+ * Recolour the live map for another basemap (`restyle`): the same changes the
+ * style was built with, so nothing — deck's layers, the names' data, the
+ * symbols — is rebuilt. A layer the style lacks (the shadow, when off) is skipped.
+ */
+function applyBasemap() {
+  if (!map) return;
+  for (const change of restyle(viewer.basemap.value)) {
+    if (!map.getLayer(change.layer)) continue;
+    if ("filter" in change) map.setFilter(change.layer, change.filter);
+    else if ("paint" in change) {
+      map.setPaintProperty(
+        change.layer,
+        change.paint as Parameters<typeof map.setPaintProperty>[1],
+        change.value as Parameters<typeof map.setPaintProperty>[2],
+      );
+    } else {
+      // An unset layout property is its default; for visibility, that is shown.
+      const value = change.value ?? (change.layout === "visibility" ? "visible" : undefined);
+      map.setLayoutProperty(
+        change.layer,
+        change.layout as Parameters<typeof map.setLayoutProperty>[1],
+        value as Parameters<typeof map.setLayoutProperty>[2],
+      );
+    }
+  }
+}
+
+watch(viewer.basemap, applyBasemap);
+
+/**
  * Framing a switch (`map/framing.ts`): a request when the store counts one, a
  * move — or none — once the new model's bounds are here, withdrawn if the user
  * moves the map first.
@@ -457,7 +488,7 @@ onMounted(() => {
     container: container.value,
     // The shadow is in the style only if this organisation switched it on and
     // the server it came from has the tiles; the catalogue answers both as one.
-    style: greyBasemap({ shoreShadow: props.config.shore_shadow }),
+    style: viewerBasemap({ shoreShadow: props.config.shore_shadow, basemap: viewer.basemap.value }),
     center: props.config.default_view.center,
     zoom: props.config.default_view.zoom,
     attributionControl: { compact: true },

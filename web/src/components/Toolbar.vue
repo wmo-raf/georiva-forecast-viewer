@@ -16,14 +16,19 @@
  * colour and radius are the operator's or the map's. A model with no pressure
  * binding disables it. One dropup is open at a time.
  *
- * In the Weather layer both are disabled, saying why: Weather is symbols and
+ * The basemap is a third dropup: Grey or Light, each with a swatch of its
+ * ground. The pick is kept for the kind of layer on screen — Weather opens on
+ * light and the rasters on grey until someone chooses otherwise.
+ *
+ * In the Weather layer wind and pressure are disabled, saying why: Weather is symbols and
  * nothing else. Their settings are kept, and are drawn again on leaving it.
  *
  * Full screen covers the whole page, chrome included, and is left out where
  * the browser has no Fullscreen API (Safari on iPhone) rather than shown as a
  * button that can never work.
  */
-import { ChevronUp, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { ChevronUp, Gauge, Map as MapIcon, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { BASEMAPS } from "../map/basemap";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useZoom } from "../map/zoom";
 import { useViewer } from "../state/store";
@@ -43,12 +48,13 @@ const windTitle = computed(() => {
 const windOn = computed(() => viewer.state.wind.on && windAvailable.value);
 const settings = computed(() => viewer.state.wind);
 /** A toolbar button that opens a panel above the bar. */
-type Dropup = "wind" | "pressure";
+type Dropup = "wind" | "pressure" | "basemap";
 
 /** The dropup that is open, if any: one at a time, so they never stack over each other. */
 const open = ref<Dropup | null>(null);
 const windOpen = computed(() => open.value === "wind");
 const pressureOpen = computed(() => open.value === "pressure");
+const basemapOpen = computed(() => open.value === "basemap");
 
 function toggle(which: Dropup) {
   open.value = open.value === which ? null : which;
@@ -228,6 +234,23 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
+    <div v-if="basemapOpen" id="basemap-panel" class="dropup" role="radiogroup" aria-label="Basemap">
+      <span class="dropup__title dropup__heading">Basemap</span>
+      <label v-for="b in BASEMAPS" :key="b.name" class="dropup__switch-row dropup__switch-row--plain">
+        <span class="basemap__option">
+          <span class="basemap__swatch" :style="{ background: b.swatch }" aria-hidden="true"></span>
+          {{ b.label }}
+        </span>
+        <input
+          type="radio"
+          name="basemap"
+          :value="b.name"
+          :checked="viewer.basemap.value === b.name"
+          @change="viewer.setBasemap(b.name)"
+        />
+      </label>
+    </div>
+
     <div class="tools__bar" role="toolbar" aria-label="Map tools">
       <button
         type="button"
@@ -284,6 +307,24 @@ onBeforeUnmount(() => {
         <ChevronUp
           class="tools__caret"
           :class="{ 'tools__caret--open': pressureOpen }"
+          :size="12"
+          :stroke-width="2"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        class="tools__button tools__button--dropup"
+        title="Basemap"
+        aria-label="Basemap"
+        :aria-expanded="basemapOpen"
+        aria-controls="basemap-panel"
+        @click="toggle('basemap')"
+      >
+        <MapIcon :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <ChevronUp
+          class="tools__caret"
+          :class="{ 'tools__caret--open': basemapOpen }"
           :size="12"
           :stroke-width="2"
           aria-hidden="true"

@@ -46,9 +46,12 @@ GeoRiva's process and talks to it over public HTTP routes only.
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
 - **Settings** — the opening view, per organisation. Not the basemap: the viewer
-  ships one style of its own (`web/src/map/basemap.ts`), a flat neutral grey
-  with no ocean fill, chosen to carry value-encoded rasters and white wind
-  trails, and it cannot be replaced. Land and sea being the same grey, the only
+  ships its own style (`web/src/map/basemap.ts`) in two built-in palettes, and
+  neither can be replaced. **Grey**, a flat neutral grey with no ocean fill,
+  chosen to carry value-encoded rasters and white wind trails, is what the
+  rasters open on; **Light**, core's light colours with the ocean filled, is
+  what Weather opens on. Users switch from the toolbar, and the choice is
+  remembered for each kind of layer. Land and sea being the same grey, the only
   thing separating them is a coastline and the soft shadow in the water beside
   it — raster tiles rendered from Natural Earth and shipped inside the bundle
   ([`docs/shore-shadow.md`](docs/shore-shadow.md)). Everything the viewer draws

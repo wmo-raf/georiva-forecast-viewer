@@ -4,7 +4,10 @@ import {
   PLACES_SOURCE_ID,
   WEATHER_SYMBOLS_LAYER_ID,
   WEATHER_SYMBOLS_SOURCE_ID,
-  greyBasemap,
+  applyRestyle,
+  restyle,
+  viewerBasemap as greyBasemap,
+  viewerBasemap,
 } from "./basemap";
 import { VALUED_CLASSES } from "./places";
 
@@ -292,5 +295,40 @@ describe("the weather symbols", () => {
     const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { source?: string };
     expect(layer.source).toBe(WEATHER_SYMBOLS_SOURCE_ID);
     expect(ids.at(-1)).toBe(WEATHER_SYMBOLS_LAYER_ID);
+  });
+});
+
+describe("the light basemap", () => {
+  const light = viewerBasemap({ shoreShadow: true, basemap: "light" });
+  type Loose = { filter?: unknown; layout?: Record<string, unknown>; paint: Record<string, unknown> };
+  const layerOf = (style: typeof light, id: string) => style.layers.find((l) => l.id === id) as unknown as Loose;
+
+  /** A restyle naming a layer the style lacks throws on the live map, not here — so it is checked here. */
+  it("restyles only layers the style has", () => {
+    const names = new Set(GREY_BASEMAP.layers.map((layer) => layer.id));
+    for (const basemap of ["grey", "light"] as const) {
+      for (const op of restyle(basemap)) expect(names, `${op.layer} is not in the style`).toContain(op.layer);
+    }
+  });
+
+  /** A switch is a restyle of the live map, so it must round-trip: light and back is exactly grey. */
+  it("switches back to exactly the grey it came from", () => {
+    expect(applyRestyle(structuredClone(light), restyle("grey"))).toEqual(GREY_BASEMAP);
+    expect(applyRestyle(structuredClone(GREY_BASEMAP), restyle("light"))).toEqual(light);
+  });
+
+  it("fills the ocean, which on grey is the bare ground", () => {
+    expect(JSON.stringify(layerOf(GREY_BASEMAP, "lake").filter)).toContain('"lake"');
+    expect(JSON.stringify(layerOf(light, "lake").filter)).not.toContain('"lake"');
+  });
+
+  it("hides the shore's shadow, which on pale water would read as a stain", () => {
+    expect(layerOf(light, "shore-shadow").layout?.visibility).toBe("none");
+    expect(layerOf(GREY_BASEMAP, "shore-shadow").layout?.visibility ?? "visible").toBe("visible");
+  });
+
+  it("writes the names dark, on a light halo", () => {
+    expect(layerOf(light, "city-lg").paint["text-halo-color"]).toBe("#ffffff");
+    expect(layerOf(GREY_BASEMAP, "city-lg").paint["text-halo-color"]).not.toBe("#ffffff");
   });
 });
