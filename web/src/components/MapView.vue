@@ -57,6 +57,7 @@ import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
 import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
 import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
+import { isobarPalette } from "../map/isobars";
 import { particleCount, type Bounds } from "../map/particles";
 import { placesWithValues, VALUED_CLASSES } from "../map/places";
 import { readValue } from "../map/sample";
@@ -84,7 +85,8 @@ const WIND = {
 };
 
 /**
- * Isobars as Windy draws them: thin pale-green hairlines, every line the same.
+ * Isobars as Windy draws them: hairlines, every one the same width, each in
+ * the colour of its own pressure (`map/isobars.ts`).
  *
  * Uniform on purpose. The layer can mark every nth line "major", but only by
  * drawing every *other* line at half the width and half the alpha, which made
@@ -92,7 +94,6 @@ const WIND = {
  * interval, no line is minor. The interval is the operator's, per source.
  */
 const ISOBARS = {
-  color: [198, 251, 196, 191] as [number, number, number, number],
   width: 1.5,
 };
 
@@ -206,7 +207,7 @@ function pressureLayers() {
             id: ISOBAR_LAYER_ID,
             interval: overlay.interval,
             majorInterval: overlay.interval,
-            color: ISOBARS.color,
+            palette: isobarPalette(overlay.to_hpa),
             width: ISOBARS.width,
           }),
         ]
