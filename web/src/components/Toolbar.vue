@@ -27,7 +27,7 @@
  * the browser has no Fullscreen API (Safari on iPhone) rather than shown as a
  * button that can never work.
  */
-import { ChevronUp, Gauge, Map as MapIcon, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { ChevronUp, Earth, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
 import { BASEMAPS } from "../map/basemap";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useZoom } from "../map/zoom";
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
         aria-controls="basemap-panel"
         @click="toggle('basemap')"
       >
-        <MapIcon :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <Earth :size="16" :stroke-width="1.75" aria-hidden="true" />
         <ChevronUp
           class="tools__caret"
           :class="{ 'tools__caret--open': basemapOpen }"
