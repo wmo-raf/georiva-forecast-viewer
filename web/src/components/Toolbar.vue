@@ -94,6 +94,8 @@ watch(symbolsAvailable, (available) => {
 
 /** What the symbols are, or why they are not on the map. */
 const symbolsNote = computed(() => {
+  // Switched off, nothing is loading and nothing needs explaining.
+  if (!viewer.state.symbols.on) return "";
   const current = symbols.value;
   switch (current.state) {
     case "loading":
@@ -267,9 +269,9 @@ onBeforeUnmount(() => {
       </label>
       <p v-if="symbolsNote" class="dropup__note">{{ symbolsNote }}</p>
       <button
-        v-if="symbols.state === 'other-run'"
+        v-if="viewer.symbolsRunListed.value"
         type="button"
-        class="wind__reset"
+        class="dropup__link"
         @click="viewer.showSymbolsRun()"
       >
         Show that run

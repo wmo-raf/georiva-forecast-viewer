@@ -366,13 +366,23 @@ function setSymbols(on: boolean) {
   state.symbols.on = on;
 }
 
-/** Select the run the symbols were built from, if the timeline has it; whether it did. */
-function showSymbolsRun(): boolean {
-  const wanted = state.symbolsMatrix?.reference_time;
-  const match = wanted ? state.timeline?.runs.find((r) => Date.parse(r.reference_time) === Date.parse(wanted)) : undefined;
-  if (!match) return false;
-  pickRun(match.reference_time);
-  return true;
+/**
+ * The run the symbols were built from, as the timeline lists it — when another
+ * run is selected and the timeline has that one. What "Show that run" offers;
+ * absent, there is nothing to offer, and no button.
+ */
+const symbolsRun = computed(() => {
+  const current = symbols.value;
+  if (current.state !== "other-run") return null;
+  const wanted = Date.parse(current.run);
+  return state.timeline?.runs.find((r) => Date.parse(r.reference_time) === wanted) ?? null;
+});
+
+const symbolsRunListed = computed(() => symbolsRun.value !== null);
+
+/** Select the run the symbols were built from. */
+function showSymbolsRun() {
+  if (symbolsRun.value) pickRun(symbolsRun.value.reference_time);
 }
 
 function step(delta: number) {
@@ -416,6 +426,7 @@ export function useViewer() {
     symbolsModel,
     symbols,
     symbolsToDraw,
+    symbolsRunListed,
     load,
     pickQuantity,
     pickSource,

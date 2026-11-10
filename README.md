@@ -39,6 +39,10 @@ GeoRiva's process and talks to it over public HTTP routes only.
   set in `icons.json`. Per organisation.
 - **Source** — one model the viewer can show: one collection, with a name, a
   short descriptor ("9 km") and an order. Owned through its collection.
+  Optionally a **weather symbols model**: the slug of a `georiva-publisher-forti`
+  model whose town forecasts (`/api/forecast/<model>/places/`) the map draws as
+  Yr symbols over the towns — icon, temperature, wind. Symbols are drawn only
+  over the run that model last published; the toolbar switch starts on.
 - **Binding** — which of a source's variables *is* a quantity. IFS `t2m` and
   WRF `t2` are one quantity through two bindings; IFS `10u`/`10v` and WRF
   `u10`/`v10` are one wind.
@@ -71,6 +75,7 @@ and *Settings → Forecast viewer settings*.
   "quantities": [
     {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "sources": [
       {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m",
+       "symbols_model": "ecmwf-ifs",
        "pressure": {"variable": "msl", "interval": 400.0, "to_hpa": 0.01, "version": "…"}},
       {"slug": "wrf", "name": "KMD WRF", "catalog": "models", "collection": "wrf-3km", "variable": "t2"}
     ]},
@@ -95,6 +100,10 @@ pressure variable's own render-config token for its texture's `v=`. A variable
 whose unit stops being a pressure after it was bound (a unit is core's to edit)
 drops the overlay for that source with a logged warning; the route still
 answers.
+
+`symbols_model` is on every source, blank when none is set. It is the
+operator's word, not discovered: Forti does not say which collection a model is
+published from, so the viewer is told.
 
 ## Development
 

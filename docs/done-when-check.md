@@ -71,18 +71,19 @@ install log. Filed as wmo-raf/georiva#602; see item 7.
 ## 2. `web/` uses only public HTTP routes, with no private routes or workarounds
 
 **Yes.** Every GeoRiva address the bundle builds lives in `src/api/addresses.ts`
-— five of them, all public, all relative to the page's own origin:
+— six of them, all public, all relative to the page's own origin:
 
 ```
 /api/forecast-viewer/                                             this plugin's catalogue
 /api/runs/<catalog>/<collection>/?limit=200                       core #592
 /api/edr/collections/<collection>/                                core EDR
+/api/forecast/<model>/places/                                     georiva-publisher-forti (weather symbols)
 /titiler/<org>/<cat>/<coll>/<var>/encoded-preview.png             core ADR 0021
 /titiler/<org>/<cat>/<coll>/vector-preview.png?u_variable=…       core #593
 ```
 
 `grep -rE "https?://|/api/|/titiler/|/martin/" src/` outside the tests finds
-exactly those five plus one more string: the built-in default basemap style URL
+exactly those six plus one more string: the built-in default basemap style URL
 in `MapView.vue`, which an organisation replaces in the admin. The two `fetch`
 calls in the bundle (`api/client.ts`, `map/texture.ts`) are both handed a URL
 that `addresses.ts` built — neither assembles one of its own.

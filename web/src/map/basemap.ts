@@ -48,6 +48,7 @@
  * `SHADOW_OPACITY` for what drawing it over a palette costs.
  */
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import { ICON_PREFIX } from "./weatherIcons";
 
 /** The layer the viewer's own layers insert before. Core's name, core's role. */
 export const DATA_ANCHOR_ID = "georiva-data-anchor";
@@ -700,20 +701,6 @@ const waterLabels: LayerSpecification[] = (
 );
 
 /**
- * The style, with or without the shadow.
- *
- * A function rather than a constant because the shadow is the one part of
- * this map that may genuinely be absent: its tiles are rendered on the server
- * that serves them, not shipped with the bundle, and an organisation switches
- * it on once that has been done (`docs/shore-shadow.md`). The catalogue tells
- * us both facts as one `shore_shadow` flag.
- *
- * When it is off, the layer *and its source* are left out rather than hidden.
- * A hidden layer still has a source, and a source with no pyramid behind it is
- * several hundred 404s on every pan — so "off" has to mean the style does not
- * know the tiles exist.
- */
-/**
  * A town's weather, read like Yr's map: the symbol over the name, then the
  * temperature and the wind with an arrow.
  *
@@ -728,7 +715,7 @@ const weatherSymbols: LayerSpecification = {
   type: "symbol",
   source: WEATHER_SYMBOLS_SOURCE_ID,
   layout: {
-    "icon-image": ["case", ["has", "symbol"], ["concat", "yr:", ["get", "symbol"]], ""],
+    "icon-image": ["case", ["has", "symbol"], ["concat", ICON_PREFIX, ["get", "symbol"]], ""],
     "icon-anchor": "bottom",
     "text-anchor": "top",
     "text-font": REGULAR,
@@ -755,6 +742,20 @@ const weatherSymbols: LayerSpecification = {
   paint: textPaint,
 };
 
+/**
+ * The style, with or without the shadow.
+ *
+ * A function rather than a constant because the shadow is the one part of
+ * this map that may genuinely be absent: its tiles are rendered on the server
+ * that serves them, not shipped with the bundle, and an organisation switches
+ * it on once that has been done (`docs/shore-shadow.md`). The catalogue tells
+ * us both facts as one `shore_shadow` flag.
+ *
+ * When it is off, the layer *and its source* are left out rather than hidden.
+ * A hidden layer still has a source, and a source with no pyramid behind it is
+ * several hundred 404s on every pan — so "off" has to mean the style does not
+ * know the tiles exist.
+ */
 export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } = {}): StyleSpecification {
   return {
     version: 8,

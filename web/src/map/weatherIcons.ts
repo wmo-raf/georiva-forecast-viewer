@@ -26,11 +26,6 @@ const URLS: Record<string, string> = Object.fromEntries(
   ).map(([path, url]) => [path.replace(/^.*\/(.+)\.svg$/, "$1"), url]),
 );
 
-/** The style image id for a symbol code. */
-export function iconId(symbolCode: string): string {
-  return `${ICON_PREFIX}${symbolCode}`;
-}
-
 function rasterise(url: string, pixelRatio: number): Promise<ImageData> {
   return new Promise((resolve, reject) => {
     const image = new Image();
