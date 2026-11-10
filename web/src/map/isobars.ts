@@ -1,7 +1,8 @@
 /**
- * The isobars' colours: each line in the colour of the pressure it is drawn at,
- * the way Windy draws them — blue around deep lows, pale green through the
- * band most of the tropics sits in, cream over the highs.
+ * The isobars' colours: each line in the colour of the pressure it is drawn at —
+ * blue around deep lows, pale green through the band most of the tropics sits
+ * in, cream over the highs. The H/L labels take the same colours, so a centre
+ * reads as the middle of its own rings.
  *
  * Fixed here rather than taken from the pressure variable's own style in core,
  * for two reasons. A line's colour is part of how the chart reads, as the
@@ -17,7 +18,7 @@
 type Rgba = [number, number, number, number];
 
 /** The lines' alpha: the hairline isobars sit over the raster rather than on it. */
-const ALPHA = 191;
+const LINE_ALPHA = 191;
 
 /**
  * The stops, in hPa. The layer interpolates between them and holds the end
@@ -36,7 +37,9 @@ const STOPS_HPA: readonly [number, [number, number, number]][] = [
 /**
  * The palette in the texture's own unit: a source stored in Pa puts its stops
  * at 97000 and up, so the same pressure is the same colour on every model.
+ * Lines take the default, translucent alpha; labels pass 255, since
+ * see-through text reads as washed out.
  */
-export function isobarPalette(toHpa: number): [number, Rgba][] {
-  return STOPS_HPA.map(([hpa, [r, g, b]]) => [hpa / toHpa, [r, g, b, ALPHA]]);
+export function isobarPalette(toHpa: number, alpha: number = LINE_ALPHA): [number, Rgba][] {
+  return STOPS_HPA.map(([hpa, [r, g, b]]) => [hpa / toHpa, [r, g, b, alpha]]);
 }

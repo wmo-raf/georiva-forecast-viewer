@@ -62,10 +62,10 @@ are captured with the texture when it lands, so a frame is always drawn in its
 own unit. The texture URL carries the pressure variable's `version`, not the
 source's, which is the selected raster's.
 
-The look follows Windy: uniform hairline isobars, each coloured by its own
-pressure — blue around deep lows, pale green (`#c6fbc4`) through the normal
-band, cream over highs (`map/isobars.ts`, fixed rather than the operator's) —
-and white H/L letters with a thin dark outline. The pastels are designed for
+The isobars are uniform hairlines, each coloured by its own pressure — blue
+around deep lows, pale green (`#c6fbc4`) through the normal band, cream over
+highs (`map/isobars.ts`, fixed rather than the operator's) — and the H/L
+labels take the same colours over a faint dark halo. The pastels are designed for
 rasters whose empty values are transparent or mid-tone; over a palette that
 paints "nothing" opaque white, as a precipitation palette starting at white
 does, they vanish, and the fix is that palette's lowest stop (`#ffffff00`). The rules that scale with the

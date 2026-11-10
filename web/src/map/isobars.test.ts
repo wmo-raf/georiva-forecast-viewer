@@ -18,4 +18,9 @@ describe("the isobars' colours, by the pressure each line is drawn at", () => {
     expect(palette.map(([value]) => value)).toEqual([97000, 99000, 100500, 101300, 102200, 103200]);
     expect(palette.map(([, colour]) => colour)).toEqual(isobarPalette(1).map(([, colour]) => colour));
   });
+
+  it("can be drawn opaque, for the H/L labels coloured to match their lines", () => {
+    expect(isobarPalette(1, 255)[0]).toEqual([970, [74, 134, 209, 255]]);
+    expect(isobarPalette(1, 255).map(([, colour]) => colour[3])).toEqual([255, 255, 255, 255, 255, 255]);
+  });
 });
