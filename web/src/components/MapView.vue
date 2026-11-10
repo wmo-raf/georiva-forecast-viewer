@@ -99,26 +99,19 @@ const ISOBARS = {
 
 /**
  * Highs and lows: larger than the layer's default, each in its isobars' colour
- * (the `palette` is set per texture, below), over a faint dark halo that reads
- * as a soft shadow — enough to lift pastel text off trails and a light raster
- * without inking it. The layer draws the letter at 1.2× `textSize` and the
- * value at `textSize`; that ratio is not a prop.
+ * (the `palette` is set per texture, below), with a thin black stroke so the
+ * pastel text holds up over trails and a light raster. The layer draws the
+ * letter at 1.2× `textSize` and the value at `textSize`; that ratio is not a
+ * prop.
  *
- * Even a faint halo needs the font atlas widened. deck.gl measures an SDF
- * outline in the 64 px atlas, not on screen, and only as far as the atlas pads
- * each glyph (4 px by default), and the layer hard-codes its sublayers'
- * `fontSettings`. So both label sublayers, `type` (the letter) and `value`,
- * get a wider pad and distance field through `_subLayerProps`, deck.gl's
- * documented override for a composite layer's children: an outline of 6
- * against a radius of 16 reaches about 4.5 atlas px past the glyph, ~1–1.5 px
- * on screen, inside the 10 px pad.
+ * deck.gl measures an SDF stroke in its 64 px font atlas, which pads each glyph
+ * by 4 px: an outline of 4 against the atlas's radius of 12 fills that pad,
+ * about 1 px on screen at this size, and that is as thick as the defaults go.
  */
-const LABEL_FONT = { sdf: true, buffer: 10, radius: 16 };
 const HIGH_LOW = {
   textSize: 16,
-  textOutlineWidth: 6,
-  textOutlineColor: [0, 0, 0, 89] as [number, number, number, number],
-  _subLayerProps: { type: { fontSettings: LABEL_FONT }, value: { fontSettings: LABEL_FONT } },
+  textOutlineWidth: 4,
+  textOutlineColor: [0, 0, 0, 255] as [number, number, number, number],
 };
 
 const props = defineProps<{ config: ViewerConfig }>();
