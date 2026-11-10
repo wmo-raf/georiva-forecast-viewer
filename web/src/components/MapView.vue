@@ -23,6 +23,14 @@
  * playback never runs ahead of the wind; a failed load leaves the frame on
  * screen rather than blanking the map.
  *
+ * A frame is painted through its own parameter, not the selection's
+ * (`state/drawn.ts`): a quantity switch within one model keeps the old frame
+ * up, in its own colours and under its own legend, until the new texture
+ * lands, and then both change at once. A switch to another model clears the
+ * map instead — its run, its times and its grid are not the old frame's.
+ * A thin bar along the top edge says a frame is on its way, once the wait is
+ * long enough to notice.
+ *
  * The scalar's slot also feeds the names: every city and town on screen
  * carries the value under it (`map/places.ts`), read off the texture already
  * drawn, so a value costs no request. They are refilled when the frame
@@ -43,6 +51,8 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import { ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { ViewerConfig } from "../api/types";
+import type { Frame } from "../state/drawn";
+import { delayed } from "../ui/delayed";
 import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
 import { particleCount, type Bounds } from "../map/particles";
 import { placesWithValues, VALUED_CLASSES } from "../map/places";
@@ -89,17 +99,18 @@ let overlay: MapLibreOverlay | null = null;
  */
 interface Slot {
   texture: Ref<Texture | null>;
-  /** The source and variable the drawn texture shows, as `follow` was told when it loaded. */
-  shows: Ref<string | null>;
+  /** What the drawn texture is a frame of, as `follow` was told when it landed. */
+  shows: Ref<Frame | null>;
   pending: Ref<boolean>;
   error: Ref<string | null>;
 }
 
-function newSlot(): Slot {
-  return { texture: shallowRef(null), shows: ref(null), pending: ref(false), error: ref(null) };
+function newSlot(shows: Ref<Frame | null> = shallowRef(null)): Slot {
+  return { texture: shallowRef(null), shows, pending: ref(false), error: ref(null) };
 }
 
-const raster = newSlot();
+// The raster's frame is the store's, so the legend reads the same one.
+const raster = newSlot(viewer.frame);
 const wind = newSlot();
 
 function windLayers() {
@@ -131,7 +142,7 @@ function windLayers() {
 
 function layers() {
   const current = raster.texture.value;
-  const palette = viewer.parameter.value?.["x-georiva"].palette;
+  const palette = viewer.shownParameter.value?.["x-georiva"].palette;
   if (!current || !palette) return windLayers();
   return [
     new RasterLayer({
@@ -161,7 +172,7 @@ function repaint() {
  * drawn. An empty URL clears the slot, which is how the wind toggle and a
  * model without a wind binding both take the particles off the map.
  */
-function follow(url: ComputedRef<string | null>, into: Slot, shows: () => string | null = () => null) {
+function follow(url: ComputedRef<string | null>, into: Slot, shows: () => Frame | null = () => null) {
   watch(
     url,
     async (next) => {
@@ -174,12 +185,13 @@ function follow(url: ComputedRef<string | null>, into: Slot, shows: () => string
         return;
       }
       into.pending.value = true;
-      const of = shows();
       try {
         const loaded = await loadTexture(next);
         if (url.value !== next) return;
         into.texture.value = loaded;
-        into.shows.value = of;
+        // Read on landing: the URL is unchanged, so the selection still names
+        // this texture's variable, and its parameter is the one it is drawn with.
+        into.shows.value = shows();
         into.error.value = null;
       } catch (error) {
         if (url.value !== next) return;
@@ -192,14 +204,11 @@ function follow(url: ComputedRef<string | null>, into: Slot, shows: () => string
   );
 }
 
-/** The selected source's scalar variable, which is what a value under a name must be a reading of. */
-const selectedScalar = computed(() => {
-  const source = viewer.source.value;
-  const variable = viewer.variable.value;
-  return source && variable ? `${source.catalog}/${source.collection}/${variable}` : null;
-});
+const selectedScalar = viewer.selectedScalar;
 
-follow(viewer.textureUrl, raster, () => selectedScalar.value);
+follow(viewer.textureUrl, raster, () =>
+  selectedScalar.value ? { of: selectedScalar.value, parameter: viewer.parameter.value } : null,
+);
 follow(viewer.windTextureUrl, wind);
 
 const ready = computed(() => !raster.pending.value && !wind.pending.value);
@@ -207,7 +216,15 @@ watch(ready, (value) => emit("frameReady", value), { immediate: true });
 watch(raster.error, (message) => emit("rasterError", message), { immediate: true });
 watch(wind.error, (message) => emit("windError", message), { immediate: true });
 
-watch(() => viewer.parameter.value, repaint);
+/**
+ * A frame is on its way: a texture in flight, or — on a switch to another
+ * model — the runs and description that must land before its URL exists, a
+ * wait `ready` cannot see since no texture is pending yet.
+ */
+const busy = computed(() => !ready.value || viewer.loading.value);
+const showBusy = delayed(busy, 300);
+
+watch(() => viewer.shownParameter.value, repaint);
 // `on` reaches the map through the wind texture's URL; the rest only restyle it.
 watch(
   () => [viewer.state.wind.speed, viewer.state.wind.width, viewer.state.wind.life, viewer.state.wind.density],
@@ -235,7 +252,7 @@ function refreshPlaces() {
     if (!map || !target) return;
     const features = map.querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES });
     const texture = raster.texture.value;
-    const current = texture && raster.shows.value === selectedScalar.value ? texture : null;
+    const current = texture && raster.shows.value?.of === selectedScalar.value ? texture : null;
     const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat) : () => null;
     target.setData(placesWithValues(features, valueAt, viewer.quantity.value?.decimals ?? 0));
   });
@@ -282,6 +299,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   attachMap(null);
+  raster.shows.value = null;
   map?.remove();
   map = null;
   overlay = null;
@@ -290,4 +308,5 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="container" class="map"></div>
+  <div v-if="showBusy" class="map-busy" role="progressbar" aria-label="Loading the map"></div>
 </template>

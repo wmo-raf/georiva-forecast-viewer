@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The palette of the drawn quantity as one compact pill: the unit at the left,
+ * The palette of the drawn frame as one compact pill: the unit at the left,
  * then the ramp filling the rest of it edge to edge. Everything on it comes
  * from the variable's EDR description — the stops, and the span to draw them
  * over — so a palette edited in the admin shows up here with no change in the
@@ -16,8 +16,10 @@ import { useViewer } from "../state/store";
 
 const viewer = useViewer();
 
-const hints = computed(() => viewer.parameter.value?.["x-georiva"] ?? null);
-const unit = computed(() => viewer.parameter.value?.unit?.symbol ?? "");
+// The parameter the map is painted with, not the selected one: across a
+// quantity switch the legend changes in the frame the raster does.
+const hints = computed(() => viewer.shownParameter.value?.["x-georiva"] ?? null);
+const unit = computed(() => viewer.shownParameter.value?.unit?.symbol ?? "");
 
 const bar = computed(() =>
   legendBar(hints.value?.palette, hints.value?.palette_min, hints.value?.palette_max, unit.value),
