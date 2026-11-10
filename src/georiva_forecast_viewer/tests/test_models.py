@@ -9,9 +9,19 @@ re-checks the rasters themselves at render time.
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from georiva_forecast_viewer.models import ForecastSource, Quantity, QuantityBinding
+from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, make_organisation
+from georiva_forecast_viewer.models import ForecastSource, ForecastViewerSettings, Quantity, QuantityBinding
 
-from .factories import WRF_VARIABLES, make_collection, make_quantity, make_source
+from .factories import (
+    IFS_VARIABLES,
+    WRF_VARIABLES,
+    bind,
+    give_unit,
+    make_collection,
+    make_pressure_quantity,
+    make_quantity,
+    make_source,
+)
 
 
 class BindingValidationTests(TestCase):
@@ -126,3 +136,70 @@ class QuantityKindTests(TestCase):
         temperature = make_quantity("t2m")
         temperature.kind = Quantity.Kind.VECTOR
         temperature.full_clean()
+
+
+class PressureSettingValidationTests(TestCase):
+    """The pressure overlay names one of this organisation's scalars, every binding of which is a pressure."""
+
+    def setUp(self):
+        self.settings = ForecastViewerSettings.for_site(make_organisation(DEFAULT_TEST_ORG_SLUG).site)
+        self.ifs = make_source(make_collection("ecmwf-ifs", variables=(*IFS_VARIABLES, "msl")), slug="ifs")
+
+    def _name(self, quantity):
+        self.settings.pressure_quantity = quantity
+        return self.settings
+
+    def assertRefused(self, settings):
+        with self.assertRaises(ValidationError) as caught:
+            settings.full_clean()
+        self.assertEqual(list(caught.exception.message_dict), ["pressure_quantity"])
+
+    def test_a_scalar_bound_in_a_pressure_unit_is_accepted(self):
+        mslp = make_quantity("mslp")
+        give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, mslp, variable="msl")
+        self._name(mslp).full_clean()
+
+    def test_none_is_accepted(self):
+        self._name(None).full_clean()
+
+    def test_a_vector_quantity_is_refused(self):
+        self.assertRefused(self._name(make_quantity("wind10", kind=Quantity.Kind.VECTOR)))
+
+    def test_another_organisations_quantity_is_refused(self):
+        self.assertRefused(self._name(make_quantity("mslp", org_slug="other-org")))
+
+    def test_a_quantity_bound_to_a_variable_in_no_pressure_unit_is_refused(self):
+        temperature = make_quantity("t2m")
+        give_unit(self.ifs.collection, "t2m", "K")
+        bind(self.ifs, temperature, variable="t2m")
+        self.assertRefused(self._name(temperature))
+
+    def test_the_interval_cannot_be_below_half_a_hectopascal(self):
+        self.settings.isobar_interval_hpa = 0.1
+        with self.assertRaises(ValidationError) as caught:
+            self.settings.full_clean()
+        self.assertEqual(list(caught.exception.message_dict), ["isobar_interval_hpa"])
+
+
+class PressureBindingValidationTests(TestCase):
+    """A binding to the organisation's pressure quantity must be a variable stored in a pressure unit."""
+
+    def setUp(self):
+        self.ifs = make_source(make_collection("ecmwf-ifs", variables=(*IFS_VARIABLES, "msl")), slug="ifs")
+        self.mslp = make_pressure_quantity()
+
+    def test_a_variable_in_a_pressure_unit_is_accepted(self):
+        msl = give_unit(self.ifs.collection, "msl", "Pa")
+        QuantityBinding(source=self.ifs, quantity=self.mslp, variable=msl).full_clean()
+
+    def test_a_variable_in_no_pressure_unit_is_refused(self):
+        t2m = give_unit(self.ifs.collection, "t2m", "K")
+        binding = QuantityBinding(source=self.ifs, quantity=self.mslp, variable=t2m)
+        with self.assertRaises(ValidationError) as caught:
+            binding.full_clean()
+        self.assertEqual(list(caught.exception.message_dict), ["variable"])
+
+    def test_any_unit_is_fine_for_a_quantity_that_is_not_the_overlay(self):
+        t2m = give_unit(self.ifs.collection, "t2m", "K")
+        QuantityBinding(source=self.ifs, quantity=make_quantity("t2m"), variable=t2m).full_clean()

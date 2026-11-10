@@ -2,7 +2,7 @@
 
 from georiva.core.models import Catalog, Collection, Unit, Variable
 from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, make_organisation
-from georiva_forecast_viewer.models import ForecastSource, Quantity, QuantityBinding
+from georiva_forecast_viewer.models import ForecastSource, ForecastViewerSettings, Quantity, QuantityBinding
 
 #: IFS-style slugs. A second collection uses the WRF spellings so a test can bind
 #: two differently named variables to one quantity, which is the plugin's point.
@@ -37,6 +37,25 @@ def make_quantity(slug="t2m", *, kind=Quantity.Kind.SCALAR, org_slug=DEFAULT_TES
 
 def make_source(collection, slug="ifs", **fields):
     return ForecastSource.objects.create(collection=collection, slug=slug, name=fields.pop("name", slug), **fields)
+
+
+def give_unit(collection, variable_slug, symbol):
+    """Store one of the collection's variables in ``symbol``, as core's ingestion would have converted it."""
+    unit, _ = Unit.objects.get_or_create(symbol=symbol, defaults={"name": symbol})
+    variable = collection.variables.get(slug=variable_slug)
+    variable.unit = unit
+    variable.save(update_fields=["unit"])
+    return variable
+
+
+def make_pressure_quantity(slug="mslp", *, interval_hpa=4, org_slug=DEFAULT_TEST_ORG_SLUG):
+    """A scalar quantity, named as the organisation's pressure overlay."""
+    quantity = make_quantity(slug, name="Mean sea level pressure", org_slug=org_slug)
+    settings = ForecastViewerSettings.for_site(make_organisation(org_slug).site)
+    settings.pressure_quantity = quantity
+    settings.isobar_interval_hpa = interval_hpa
+    settings.save()
+    return quantity
 
 
 def bind(source, quantity, variable=None, u=None, v=None):
