@@ -24,9 +24,10 @@ clipping (ADR 0038) can crop the image narrower than the collection's extent.
 
 ## Wind
 
-The scalar raster and the wind particles are a fixed pair: the same model, run
-and step, from two textures loaded independently (`MapView.vue`). A step counts
-as drawn only when both have settled, so playback never runs ahead of the wind.
+The scalar raster and the wind particles are the same model, run and step,
+from textures loaded independently (`MapView.vue`). A step counts as drawn only
+when every texture on the map has settled, so playback never runs ahead of the
+wind (or of the isobars, below).
 
 The wind texture is two bands over one shared range, so the decoded `atan2` is
 the direction in the source data. That is checked against the COGs rather than
@@ -46,6 +47,35 @@ boost is capped, which bites only on a world view of a small domain — where a
 trail is already several times the domain's width and the particles read as
 dense regardless.
 
+## Pressure
+
+When the organisation names a pressure quantity, each source that binds it
+carries `pressure: {variable, interval, to_hpa, version}` in the catalogue, and
+the toolbar's Pressure button offers two switches: Isobars and Highs and lows.
+Both start off and are remembered (`state/pressureSettings.ts`, through the same
+`state/storage.ts` helper as the wind's). Either one fetches the pressure
+variable's own encoded texture for the step; both draw from it.
+
+The web stays unit-blind: `interval` already arrives in the texture's unit and
+`to_hpa` is the one factor an H/L label needs, both minted by the plugin. They
+are captured with the texture when it lands, so a frame is always drawn in its
+own unit. The texture URL carries the pressure variable's `version`, not the
+source's, which is the selected raster's.
+
+The isobars are uniform hairlines, each coloured by its own pressure — blue
+around deep lows, pale green (`#c6fbc4`) through the normal band, cream over
+highs (`map/isobars.ts`, fixed rather than the operator's) — and the H/L
+labels take the same colours over a faint dark halo. The pastels are designed for
+rasters whose empty values are transparent or mid-tone; over a palette that
+paints "nothing" opaque white, as a precipitation palette starting at white
+does, they vanish, and the fix is that palette's lowest stop (`#ffffff00`). The rules that scale with the
+domain live in `map/highlow.ts` — the H/L search radius (2000 km for a global
+source, a quarter of a regional domain's shorter side) and the smoothing both
+layers apply before finding lines and centres (a grid about a fifteenth of that
+radius), so a WRF domain keeps its own detail while a global model's lines lose
+the 8-bit stair-steps and the rings over high ground. Wind and isobars are
+independent: switching one never switches the other.
+
 ## The basemap
 
 One style of its own, in `src/map/basemap.ts`: flat neutral grey, no ocean
@@ -61,9 +91,10 @@ of what this bundle fetches from outside GeoRiva, and a test in
 ## Layout
 
 - Left rail (`Rail.vue`): the organisation's name, the scalar quantities with
-  their icons (`ui/icons.ts`, the web's half of the plugin's `icons.json`),
-  and the wind toggle — which is off and disabled for a model with no wind
-  binding.
+  their icons (`ui/icons.ts`, the web's half of the plugin's `icons.json`).
+- Toolbar (`Toolbar.vue`), above the model panel: zoom, the Wind and Pressure
+  dropups — each disabled for a model with no such binding, one open at a time
+  — and full screen.
 - "Select model" (`ModelPanel.vue`), bottom right: the models bound to the
   selected quantity, each with its descriptor, and the run inside the same
   panel.

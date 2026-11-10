@@ -181,3 +181,13 @@ class SettingsAdminTests(TestCase):
     def test_the_settings_page_opens_for_this_organisation(self):
         url = reverse("wagtailsettings:edit", args=["georiva_forecast_viewer", "forecastviewersettings"])
         self.assertEqual(self.client.get(url, follow=True).status_code, 200)
+
+    def test_the_pressure_overlay_is_chosen_from_this_organisations_scalars_only(self):
+        mslp = make_quantity("mslp")
+        make_quantity("wind10", kind=Quantity.Kind.VECTOR)
+        make_quantity("theirs", org_slug="other-org")
+        url = reverse("wagtailsettings:edit", args=["georiva_forecast_viewer", "forecastviewersettings"])
+
+        form = self.client.get(url, follow=True).context["form"]
+
+        self.assertEqual(list(form.fields["pressure_quantity"].queryset), [mslp])

@@ -20,7 +20,16 @@ from georiva.organisations.testing import DEFAULT_TEST_ORG_SLUG, dial_org, join_
 from georiva_forecast_viewer.models import ForecastViewerSettings, Quantity
 from georiva_forecast_viewer.pyramid import pyramid_in
 
-from .factories import WRF_VARIABLES, bind, make_collection, make_quantity, make_source
+from .factories import (
+    IFS_VARIABLES,
+    WRF_VARIABLES,
+    bind,
+    give_unit,
+    make_collection,
+    make_pressure_quantity,
+    make_quantity,
+    make_source,
+)
 
 URL = "georiva_forecast_viewer:catalogue"
 
@@ -226,3 +235,82 @@ class ShoreShadowTests(TestCase):
         """The pyramid being on disk is not consent: an operator still chooses."""
         with TemporaryDirectory() as root, override_settings(STATIC_ROOT=self._rendered(Path(root))):
             self.assertFalse(self._flag())
+
+
+class PressureOverlayTests(TestCase):
+    """Which sources can draw isobars, and in what unit the web must draw them.
+
+    The web is unit-blind: the interval arrives in the texture's own unit and
+    ``to_hpa`` is the one multiplication its labels need, both minted here from
+    the variable's stored unit.
+    """
+
+    def setUp(self):
+        dial_org(self.client)
+        self.ifs = make_source(make_collection("ecmwf-ifs", variables=(*IFS_VARIABLES, "msl")), slug="ifs")
+
+    def _sources(self):
+        return {
+            source["slug"]: source
+            for quantity in self.client.get(reverse(URL)).json()["quantities"]
+            for source in quantity["sources"]
+        }
+
+    def test_a_source_bound_to_the_pressure_quantity_carries_its_overlay_in_its_own_unit(self):
+        give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_pressure_quantity(interval_hpa=4), variable="msl")
+
+        self.assertEqual(
+            self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 400.0, "to_hpa": 0.01, "version": ANY}
+        )
+
+    def test_the_overlay_carries_its_own_variables_render_config_token(self):
+        """Its texture is msl's, so its ``v=`` must be msl's token, not the token of the raster it is drawn over."""
+        msl = give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_quantity("t2m"), variable="t2m")
+        bind(self.ifs, make_pressure_quantity(), variable="msl")
+
+        listed = self._sources()["ifs"]
+        self.assertEqual(listed["pressure"]["version"], render_config_token(msl))
+
+    def test_a_source_already_in_hpa_draws_the_interval_as_set(self):
+        give_unit(self.ifs.collection, "msl", "hPa")
+        bind(self.ifs, make_pressure_quantity(interval_hpa=2), variable="msl")
+
+        self.assertEqual(
+            self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 2.0, "to_hpa": 1.0, "version": ANY}
+        )
+
+    def test_the_overlay_rides_on_the_source_under_every_quantity(self):
+        """It is drawn over whatever raster is picked, so whichever listing the web reads must carry it."""
+        give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_quantity("t2m"), variable="t2m")
+        bind(self.ifs, make_pressure_quantity(), variable="msl")
+
+        quantities = self.client.get(reverse(URL)).json()["quantities"]
+        self.assertEqual([q["slug"] for q in quantities], ["mslp", "t2m"])
+        self.assertTrue(all("pressure" in q["sources"][0] for q in quantities))
+
+    def test_no_pressure_quantity_named_means_no_overlay_anywhere(self):
+        give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_quantity("mslp"), variable="msl")
+
+        self.assertNotIn("pressure", self._sources()["ifs"])
+
+    def test_a_source_without_a_pressure_binding_has_no_overlay(self):
+        wrf = make_source(make_collection("wrf-3km", variables=WRF_VARIABLES), slug="wrf")
+        give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_pressure_quantity(), variable="msl")
+        bind(wrf, make_quantity("t2m"), variable="t2")
+
+        self.assertNotIn("pressure", self._sources()["wrf"])
+
+    def test_a_pressure_variable_whose_unit_is_no_pressure_loses_its_overlay_and_nothing_else(self):
+        """A unit is core's to edit, after the binding was saved; the viewer degrades, the route does not fail."""
+        give_unit(self.ifs.collection, "msl", "K")
+        bind(self.ifs, make_pressure_quantity(), variable="msl")
+
+        with self.assertLogs("georiva_forecast_viewer.views", level="WARNING"):
+            sources = self._sources()
+        self.assertEqual(sources["ifs"]["variable"], "msl")
+        self.assertNotIn("pressure", sources["ifs"])

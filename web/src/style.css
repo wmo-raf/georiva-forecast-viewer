@@ -504,7 +504,7 @@ button {
   cursor: default;
 }
 
-.tools__button--wind {
+.tools__button--dropup {
   /* Icon and caret: as wide as the pair needs. */
   padding: 0 8px;
   color: var(--fv-muted);
@@ -523,9 +523,9 @@ button {
   transform: rotate(180deg);
 }
 
-/* ---- wind dropup ---- */
+/* ---- dropups (wind, pressure) ---- */
 
-.wind {
+.dropup {
   position: absolute;
   /* Wider than the toolbar, so it hangs off the toolbar's right edge. */
   right: 0;
@@ -542,7 +542,7 @@ button {
   font-size: 13px;
 }
 
-.wind__row--switch {
+.dropup__switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -551,14 +551,14 @@ button {
   cursor: pointer;
 }
 
-.wind__title {
+.dropup__title {
   font-weight: 700;
   font-size: 14px;
 }
 
 /* A track and a knob, drawn on the checkbox itself so keyboard and screen
    readers keep the native control (`role="switch"` names it). */
-.wind__switch {
+.switch {
   appearance: none;
   position: relative;
   flex: 0 0 auto;
@@ -571,7 +571,7 @@ button {
   transition: background 150ms ease;
 }
 
-.wind__switch::before {
+.switch::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -583,17 +583,33 @@ button {
   transition: transform 150ms ease;
 }
 
-.wind__switch:checked {
+.switch:checked {
   background: var(--fv-accent);
 }
 
-.wind__switch:checked::before {
+.switch:checked::before {
   transform: translateX(16px);
 }
 
-.wind__switch:focus-visible {
+.switch:focus-visible {
   outline: 2px solid var(--fv-accent);
   outline-offset: 2px;
+}
+
+/* The pressure dropup: a heading over two switches, the last without a rule under it. */
+.dropup__heading {
+  display: block;
+  padding-bottom: 6px;
+}
+
+.dropup__switch-row--plain {
+  padding: 8px 0;
+  font-weight: 400;
+}
+
+.dropup__switch-row--plain:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
 }
 
 .wind__settings {
@@ -686,8 +702,8 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .tools__caret,
-  .wind__switch,
-  .wind__switch::before {
+  .switch,
+  .switch::before {
     transition: none;
   }
 }

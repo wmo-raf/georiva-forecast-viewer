@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * The left rail: the quantities a user can show. The map draws a fixed pair,
- * the selected scalar quantity plus wind, so the list is scalar quantities
- * only; wind is the toolbar's, which owns its switch and its settings.
+ * The left rail: the quantities a user can show. The map draws the selected
+ * scalar quantity with wind and the pressure overlay over it, so the list is
+ * scalar quantities only; wind and pressure are the toolbar's, which owns
+ * their switches and settings.
  *
  * It collapses behind a pill that names the quantity on the map. The pill is
  * the only thing that opens or closes it: picking a quantity, Escape and the

@@ -3,12 +3,15 @@
  *
  * The defaults are the values tuned by eye against both models before any of
  * this was adjustable, so nothing changes for someone who never opens the
- * dropup. The settings are the viewer's one piece of remembered state: they go
- * to `localStorage` and come back on the next visit. Storage is a convenience
+ * dropup. The settings are remembered, as the pressure overlay's switches are
+ * (`pressureSettings.ts`): they go to `localStorage` and come back on the next
+ * visit. Storage is a convenience
  * and nothing more — private windows, blocked site data and a value written by
  * an older version all fall back to the defaults, field by field, rather than
  * reaching the particle layer as something it cannot draw.
  */
+
+import { browserStorage, loadRemembered, saveRemembered } from "./storage";
 
 /** A multiplier on the automatic particle budget (`map/particles.ts`), not a count. */
 export type Density = 0.5 | 1 | 2;
@@ -73,28 +76,10 @@ export function sanitize(raw: unknown): WindSettings {
   };
 }
 
-/** The storage the browser offers, or none: reading `localStorage` itself can throw. */
-function browserStorage(): Storage | null {
-  try {
-    return typeof localStorage === "undefined" ? null : localStorage;
-  } catch {
-    return null;
-  }
-}
-
 export function loadWindSettings(storage: Storage | null = browserStorage()): WindSettings {
-  try {
-    const stored = storage?.getItem(STORAGE_KEY);
-    return sanitize(stored ? JSON.parse(stored) : null);
-  } catch {
-    return { ...DEFAULT_WIND };
-  }
+  return loadRemembered(STORAGE_KEY, sanitize, storage);
 }
 
 export function saveWindSettings(settings: WindSettings, storage: Storage | null = browserStorage()): void {
-  try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Full, blocked or private: the settings still hold for this visit.
-  }
+  saveRemembered(STORAGE_KEY, settings, storage);
 }

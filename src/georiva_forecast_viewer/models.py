@@ -19,21 +19,26 @@ are per Site, which is the organisation (core's ``GeoRivaSettings``).
 """
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
+from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.contrib.settings.models import BaseSiteSetting, register_setting
 
 from georiva.organisations.access import organisation_of
 
 from .icons import validate_icon
+from .pressure import hpa_per_unit
 
 #: The three fields a binding may name a variable in.
 VARIABLE_FIELDS = ("variable", "u_variable", "v_variable")
 
 #: The same-collection refusal, worded once: the model and the source form both say it.
 FOREIGN_VARIABLE = "Choose a variable from this source's collection."
+
+#: The pressure overlay's unit refusal, from either side of the pairing.
+NOT_A_PRESSURE = "The pressure overlay needs a variable stored in a pressure unit (Pa, hPa, …)."
 
 
 class Quantity(models.Model):
@@ -223,6 +228,15 @@ class QuantityBinding(models.Model):
                         "A scalar quantity is one variable; leave the components blank.", code="component_on_scalar"
                     )
 
+        if (
+            "variable" not in errors
+            and self.variable_id is not None
+            and self.quantity_id
+            and is_pressure_overlay(self.quantity)
+            and hpa_per_unit(self.variable) is None
+        ):
+            errors["variable"] = ValidationError(NOT_A_PRESSURE, code="not_a_pressure")
+
         if collection_id:
             for field in VARIABLE_FIELDS:
                 if field in errors:
@@ -233,6 +247,27 @@ class QuantityBinding(models.Model):
 
         if errors:
             raise ValidationError(errors)
+
+
+class ForecastViewerSettingsForm(WagtailAdminModelForm):
+    """Offers the pressure overlay only this organisation's scalars.
+
+    The settings page is Wagtail's own and not one of the org-scoped viewsets,
+    so its one chooser is narrowed here: unnarrowed, it would list every
+    tenant's quantity names. ``clean`` is the refusal; this is the hint.
+
+    Narrowed by the settings row's own organisation rather than through
+    ``scope_rows``, deliberately: a form has no request to scope by, and the
+    row being edited *is* the organisation's — a Site setting is per Site, and
+    the Site is the organisation. ``QuantityBinding.clean`` compares owners
+    the same way, for the same reason.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["pressure_quantity"].queryset = Quantity.objects.filter(
+            organisation=organisation_of(self.instance), kind=Quantity.Kind.SCALAR
+        )
 
 
 @register_setting(icon="globe")
@@ -246,6 +281,8 @@ class ForecastViewerSettings(BaseSiteSetting):
     """
 
     ORGANISATION_LOOKUP = "site__organisation"
+
+    base_form_class = ForecastViewerSettingsForm
 
     default_longitude = models.FloatField(default=20.0, help_text="Centre of the map when the viewer opens.")
     default_latitude = models.FloatField(default=0.0, help_text="Centre of the map when the viewer opens.")
@@ -264,5 +301,63 @@ class ForecastViewerSettings(BaseSiteSetting):
         ),
     )
 
+    #: Which quantity is mean sea level pressure, drawn as isobars and highs/lows
+    #: over whatever raster is selected. A setting rather than a kind or a role
+    #: on the quantity: there is at most one, and it stays an ordinary scalar
+    #: the rail can still offer as a raster. Each source draws it through its
+    #: own binding, as it draws wind.
+    pressure_quantity = models.ForeignKey(
+        Quantity,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name="Pressure overlay quantity",
+        help_text=(
+            "The scalar quantity drawn as isobars and highs/lows over any map. "
+            "Every variable bound to it must be stored in a pressure unit."
+        ),
+    )
+    isobar_interval_hpa = models.FloatField(
+        default=4.0,
+        validators=[MinValueValidator(0.5)],
+        verbose_name="Isobar interval (hPa)",
+        help_text="Spacing between isobars. 4 hPa is the synoptic convention; 2 hPa suits the tropics.",
+    )
+
     class Meta:
         verbose_name = "Forecast viewer settings"
+
+    def clean(self):
+        """The overlay is one of this organisation's scalars, and every variable bound to it is a pressure.
+
+        The binding refuses a non-pressure variable once the quantity is named
+        here; this is the other order, a quantity already bound being named.
+        """
+        super().clean()
+        quantity = self.pressure_quantity
+        if quantity is None:
+            return
+        if quantity.organisation_id != getattr(organisation_of(self), "pk", None):
+            problem = "This quantity belongs to another organisation."
+        elif quantity.kind != Quantity.Kind.SCALAR:
+            problem = "Isobars are drawn from one variable; choose a scalar quantity."
+        else:
+            strays = [
+                f"{binding.source} ({binding.variable})"
+                for binding in quantity.bindings.select_related("source", "variable__unit")
+                if binding.variable is not None and hpa_per_unit(binding.variable) is None
+            ]
+            problem = f"{NOT_A_PRESSURE} Not one: {', '.join(strays)}." if strays else None
+        if problem:
+            raise ValidationError({"pressure_quantity": ValidationError(problem, code="not_a_pressure_overlay")})
+
+
+def is_pressure_overlay(quantity):
+    """Whether ``quantity`` is the one its organisation draws as isobars.
+
+    Asked of the settings table rather than a Site: a quantity is named only by
+    its own organisation's settings, which refuse anyone else's, so any row
+    naming it is the right one — and asking creates nothing.
+    """
+    return ForecastViewerSettings.objects.filter(pressure_quantity=quantity).exists()
