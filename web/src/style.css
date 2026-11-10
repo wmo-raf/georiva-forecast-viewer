@@ -52,6 +52,50 @@ body,
   inset: 0;
 }
 
+/* A frame on its way: a thin bar sliding along the map's top edge, above the
+   data and below every panel. Shown only once a wait outlasts a scrub step's
+   (`ui/delayed.ts`), so playback does not flicker it. */
+.map-busy {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(47, 182, 201, 0.15);
+}
+
+.map-busy::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  background: var(--fv-accent);
+  animation: fv-busy 1.1s ease-in-out infinite;
+}
+
+@keyframes fv-busy {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* No slide without motion; the bar itself still says something is coming. */
+@media (prefers-reduced-motion: reduce) {
+  .map-busy::before {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 button {
   font: inherit;
   color: inherit;

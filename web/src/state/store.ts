@@ -7,10 +7,11 @@
  * only sequences the loads and keeps the latest answer.
  */
 
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, shallowRef, watch } from "vue";
 import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
 import { loadCatalogue, loadEdr, loadRuns } from "../api/client";
 import type { Catalogue, EdrCollection, EdrParameter, Quantity, Source } from "../api/types";
+import { drawnParameter, type Frame } from "./drawn";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
 import { buildTimeline, stepIndex, type Timeline } from "./timeline";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
@@ -127,6 +128,24 @@ const variable = computed(() => source.value?.variable ?? null);
 const parameter = computed<EdrParameter | null>(() =>
   variable.value && state.edr && timelineCurrent.value ? (state.edr.parameter_names[variable.value] ?? null) : null,
 );
+
+/** The selected source's scalar variable: what the frame on screen must be a reading of to be the selection's. */
+const selectedScalar = computed(() =>
+  source.value && variable.value ? `${source.value.catalog}/${source.value.collection}/${variable.value}` : null,
+);
+
+/**
+ * The raster frame on screen, as the map reports it each time a texture lands
+ * or the raster is cleared. The map is its one writer.
+ */
+const frame = shallowRef<Frame | null>(null);
+
+/**
+ * The parameter the raster is painted with, and the legend drawn from: the
+ * frame's own, not the selection's, so a quantity switch repaints only when
+ * its texture has landed (`drawn.ts`).
+ */
+const shownParameter = computed(() => drawnParameter(frame.value, selectedScalar.value, parameter.value));
 
 const textureUrl = computed(() => {
   const org = state.catalogue?.config.org;
@@ -251,6 +270,9 @@ export function useViewer() {
     time,
     variable,
     parameter,
+    selectedScalar,
+    frame,
+    shownParameter,
     textureUrl,
     windTextureUrl,
     load,
