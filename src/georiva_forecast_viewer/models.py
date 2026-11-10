@@ -126,6 +126,17 @@ class ForecastSource(ClusterableModel):
         help_text="A short tag shown beside the name, e.g. '9 km' or 'global'.",
     )
     order = models.PositiveIntegerField(default=0, help_text="Position in the viewer's list; lower first.")
+    symbols_model = models.SlugField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Weather symbols model",
+        help_text=(
+            "The Forti forecast model (its slug under /api/forecast/) whose town "
+            "forecasts this source's weather symbols layer shows. Leave blank for "
+            "no symbols. Symbols are shown only for the run that model last published."
+        ),
+    )
 
     class Meta:
         verbose_name = "source"

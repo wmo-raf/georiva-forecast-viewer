@@ -81,6 +81,7 @@ def describe_source(binding):
         "slug": source.slug,
         "name": source.name,
         "descriptor": source.descriptor,
+        "symbols_model": source.symbols_model,
         "catalog": source.collection.catalog.slug,
         "collection": source.collection.slug,
     }

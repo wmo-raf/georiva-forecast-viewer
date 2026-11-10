@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "./basemap";
+import {
+  DATA_ANCHOR_ID,
+  PLACES_SOURCE_ID,
+  WEATHER_SYMBOLS_LAYER_ID,
+  WEATHER_SYMBOLS_SOURCE_ID,
+  greyBasemap,
+} from "./basemap";
 import { VALUED_CLASSES } from "./places";
 
 /**
@@ -148,13 +154,14 @@ describe("asset references", () => {
   });
 
   /**
-   * Nothing draws an icon, which is why no sprite is declared. The two travel
-   * together: an `icon-image` added later without a sprite is a label that
-   * silently loses half of itself.
+   * No sprite is declared, so the one layer that asks for icons is the weather
+   * symbols', whose icons `map/weatherIcons.ts` adds as they are needed. An
+   * `icon-image` anywhere else would be a label that silently loses half of
+   * itself.
    */
-  it("ask for no icon, and so declare no sprite", () => {
+  it("ask for icons only on the weather symbols, and declare no sprite", () => {
     for (const layer of GREY_BASEMAP.layers) {
-      if (layer.type !== "symbol") continue;
+      if (layer.type !== "symbol" || layer.id === WEATHER_SYMBOLS_LAYER_ID) continue;
       expect(layer.layout?.["icon-image"], `${layer.id} wants an icon but the style has no sprite`).toBeUndefined();
     }
     expect(GREY_BASEMAP.sprite).toBeUndefined();
@@ -268,5 +275,13 @@ describe("without the shore shadow", () => {
       if (!("source" in layer) || layer.source === undefined) continue;
       expect(declared, `${layer.id} names an undeclared source`).toContain(layer.source);
     }
+  });
+});
+
+describe("the weather symbols", () => {
+  it("draw over every other name, from their own source", () => {
+    const layer = GREY_BASEMAP.layers.find((l) => l.id === WEATHER_SYMBOLS_LAYER_ID) as { source?: string };
+    expect(layer.source).toBe(WEATHER_SYMBOLS_SOURCE_ID);
+    expect(ids.at(-1)).toBe(WEATHER_SYMBOLS_LAYER_ID);
   });
 });

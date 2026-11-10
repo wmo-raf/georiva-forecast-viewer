@@ -16,14 +16,21 @@
  * colour and radius are the operator's or the map's. A model with no pressure
  * binding disables it. One dropup is open at a time.
  *
+ * Weather symbols too: a button (accent while symbols are drawn) opening a
+ * switch, on by default, and a line saying what the symbols are for. They are
+ * a Forti model's latest run alone, so with another run selected the line says
+ * which run they belong to and offers to show it. A source with no symbols
+ * model disables the button.
+ *
  * Full screen covers the whole page, chrome included, and is left out where
  * the browser has no Fullscreen API (Safari on iPhone) rather than shown as a
  * button that can never work.
  */
-import { ChevronUp, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { ChevronUp, CloudSun, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useZoom } from "../map/zoom";
 import { useViewer } from "../state/store";
+import { formatRun } from "../state/runs";
 import { DENSITIES, RANGES, type Density } from "../state/windSettings";
 
 const viewer = useViewer();
@@ -36,12 +43,13 @@ const windAvailable = computed(() => viewer.windBinding.value !== null);
 const windOn = computed(() => viewer.state.wind.on && windAvailable.value);
 const settings = computed(() => viewer.state.wind);
 /** A toolbar button that opens a panel above the bar. */
-type Dropup = "wind" | "pressure";
+type Dropup = "wind" | "pressure" | "symbols";
 
 /** The dropup that is open, if any: one at a time, so they never stack over each other. */
 const open = ref<Dropup | null>(null);
 const windOpen = computed(() => open.value === "wind");
 const pressureOpen = computed(() => open.value === "pressure");
+const symbolsOpen = computed(() => open.value === "symbols");
 
 function toggle(which: Dropup) {
   open.value = open.value === which ? null : which;
@@ -73,6 +81,35 @@ watch(pressureAvailable, (available) => {
 function setPressureSwitch(key: "isobars" | "highLow", event: Event) {
   viewer.setPressure({ [key]: (event.target as HTMLInputElement).checked });
 }
+
+// ---- weather symbols ----
+
+const symbols = viewer.symbols;
+const symbolsAvailable = computed(() => symbols.value.state !== "none");
+const symbolsOn = computed(() => viewer.symbolsToDraw.value !== null);
+
+watch(symbolsAvailable, (available) => {
+  if (!available && symbolsOpen.value) open.value = null;
+});
+
+/** What the symbols are, or why they are not on the map. */
+const symbolsNote = computed(() => {
+  const current = symbols.value;
+  switch (current.state) {
+    case "loading":
+      return "Loading the town forecasts…";
+    case "unavailable":
+      return "The town forecasts are unavailable right now.";
+    case "other-run":
+      return `Symbols are for the ${formatRun(current.run)} run only.`;
+    case "ready": {
+      const window = viewer.state.symbolsMatrix?.window.duration.replace(/^PT(\d+)H$/, "$1");
+      return window ? `Each symbol covers the ${window} h from the time shown.` : "";
+    }
+    default:
+      return "";
+  }
+});
 
 function setNumber(key: "speed" | "width" | "life", event: Event) {
   viewer.setWind({ [key]: Number((event.target as HTMLInputElement).value) });
@@ -217,6 +254,28 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
+    <div v-if="symbolsOpen" id="symbols-panel" class="dropup" role="group" aria-label="Weather symbols">
+      <label class="dropup__switch-row">
+        <span class="dropup__title">Weather symbols</span>
+        <input
+          type="checkbox"
+          role="switch"
+          class="switch"
+          :checked="viewer.state.symbols.on"
+          @change="viewer.setSymbols(($event.target as HTMLInputElement).checked)"
+        />
+      </label>
+      <p v-if="symbolsNote" class="dropup__note">{{ symbolsNote }}</p>
+      <button
+        v-if="symbols.state === 'other-run'"
+        type="button"
+        class="wind__reset"
+        @click="viewer.showSymbolsRun()"
+      >
+        Show that run
+      </button>
+    </div>
+
     <div class="tools__bar" role="toolbar" aria-label="Map tools">
       <button
         type="button"
@@ -273,6 +332,26 @@ onBeforeUnmount(() => {
         <ChevronUp
           class="tools__caret"
           :class="{ 'tools__caret--open': pressureOpen }"
+          :size="12"
+          :stroke-width="2"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        class="tools__button tools__button--dropup"
+        :class="{ 'tools__button--active': symbolsOn }"
+        :title="symbolsAvailable ? 'Weather symbols' : 'This model has no weather symbols'"
+        aria-label="Weather symbols"
+        :aria-expanded="symbolsOpen"
+        aria-controls="symbols-panel"
+        :disabled="!symbolsAvailable"
+        @click="toggle('symbols')"
+      >
+        <CloudSun :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <ChevronUp
+          class="tools__caret"
+          :class="{ 'tools__caret--open': symbolsOpen }"
           :size="12"
           :stroke-width="2"
           aria-hidden="true"

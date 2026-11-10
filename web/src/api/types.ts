@@ -50,6 +50,13 @@ export interface Source {
    */
   version: string;
   pressure?: PressureOverlay;
+  /**
+   * The Forti forecast model whose town forecasts this source's weather
+   * symbols come from (`/api/forecast/{model}/places/`), or blank for none.
+   * The operator's choice: Forti does not say which collection a model is
+   * published from.
+   */
+  symbols_model: string;
 }
 
 /**
@@ -112,3 +119,36 @@ export interface EdrParameter {
 
 /** `[value, [r, g, b]]` or `[value, [r, g, b, a]]`, as WeatherLayers takes it. */
 export type PaletteStop = [number, [number, number, number] | [number, number, number, number]];
+
+/** One town of `GET /api/forecast/{model}/places/`, most prominent first. */
+export interface PlacesTown {
+  id: number;
+  name: string;
+  /** 1 capital, 2 admin-1 seat, 3 admin-2 seat, 4 town. */
+  rank: number;
+  population: number;
+  coordinates: [number, number];
+}
+
+/**
+ * `GET /api/forecast/{model}/places/`: a model's latest run told for its towns,
+ * every value as `values[field][town][time]` over `times`.
+ *
+ * Instants (`air_temperature`, `wind_*`) are read at a time; `symbol_code` and
+ * `precipitation_amount` cover the window that starts there.
+ */
+export interface PlacesMatrix {
+  model: string;
+  reference_time: string;
+  window: { duration: string };
+  times: string[];
+  units: Record<string, string>;
+  towns: PlacesTown[];
+  values: {
+    symbol_code: (string | null)[][];
+    air_temperature: (number | null)[][];
+    wind_speed: (number | null)[][];
+    wind_from_direction: (number | null)[][];
+    precipitation_amount: (number | null)[][];
+  };
+}

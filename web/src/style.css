@@ -612,6 +612,13 @@ button {
   padding-bottom: 2px;
 }
 
+.dropup__note {
+  margin: 8px 0 0;
+  color: var(--fv-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .wind__settings {
   border: 0;
   margin: 0;

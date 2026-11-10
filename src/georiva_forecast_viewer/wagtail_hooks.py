@@ -98,6 +98,7 @@ class ForecastSourceViewSet(OrgScopedViewSetMixin, SnippetViewSet):
                     FieldPanel("descriptor"),
                     FieldPanel("slug"),
                     FieldPanel("order"),
+                    FieldPanel("symbols_model"),
                 ],
                 heading="Source",
                 help_text="Which collection holds this model's runs, and what to call it in the viewer.",

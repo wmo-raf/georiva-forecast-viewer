@@ -40,6 +40,14 @@
  * value only while the texture on screen is the selected source's variable —
  * a quantity switch keeps the old frame up until the new one lands, and its
  * numbers must not sit under the new legend meanwhile.
+ *
+ * While weather symbols are drawn (`state.symbolsToDraw`), each town of the
+ * symbols model shows its Yr icon, temperature and wind for the step on
+ * screen, and carries its own name: the basemap's name for the same place
+ * gives way (`spokenFor`), and every other basemap name stays — a country with
+ * no imported towns keeps all of its own. When there are none to draw —
+ * switched off, another run selected, a step before the symbols begin — the
+ * basemap's names come back in full.
  */
 import { MapLibreOverlay } from "@deck.gl/maplibre";
 // MapLibre 6 is ESM-only and has no default export, so the namespace import.
@@ -55,13 +63,15 @@ import { ContourLayer, HighLowLayer, ImageType, ParticleLayer, RasterLayer } fro
 import type { PressureOverlay, ViewerConfig } from "../api/types";
 import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
-import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, greyBasemap } from "../map/basemap";
+import { DATA_ANCHOR_ID, PLACES_SOURCE_ID, WEATHER_SYMBOLS_SOURCE_ID, greyBasemap } from "../map/basemap";
 import { highLowRadiusKm, pressureLabel, pressureSmoothing } from "../map/highlow";
 import { isobarPalette } from "../map/isobars";
 import { particleCount, type Bounds } from "../map/particles";
 import { placesWithValues, VALUED_CLASSES } from "../map/places";
 import { readValue } from "../map/sample";
+import { spokenFor } from "../map/symbols";
 import { loadTexture, type Texture } from "../map/texture";
+import { serveWeatherIcons } from "../map/weatherIcons";
 import { attachMap } from "../map/zoom";
 import { useViewer } from "../state/store";
 
@@ -352,7 +362,10 @@ function refreshPlaces() {
     placesQueued = false;
     const target = map?.getSource<GeoJSONSource>(PLACES_SOURCE_ID);
     if (!map || !target) return;
-    const features = map.querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES });
+    const spoken = spokenFor(viewer.symbolsToDraw.value);
+    const features = map
+      .querySourceFeatures("openmaptiles", { sourceLayer: "place", filter: VALUED_PLACES })
+      .filter((place) => place.geometry.type !== "Point" || !spoken(...(place.geometry.coordinates as [number, number])));
     const texture = raster.texture.value;
     const current = texture && raster.shows.value?.of === selectedScalar.value ? texture : null;
     const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat) : () => null;
@@ -361,6 +374,19 @@ function refreshPlaces() {
 }
 
 watch([raster.texture, raster.shows, selectedScalar, () => viewer.quantity.value?.decimals], refreshPlaces);
+
+const EMPTY = { type: "FeatureCollection" as const, features: [] };
+
+/** Put the step's symbols on the map, or take them off. */
+function drawSymbols() {
+  map?.getSource<GeoJSONSource>(WEATHER_SYMBOLS_SOURCE_ID)?.setData(viewer.symbolsToDraw.value ?? EMPTY);
+}
+
+// The names follow too: the basemap's own give way only where a town is drawn.
+watch(viewer.symbolsToDraw, () => {
+  drawSymbols();
+  refreshPlaces();
+});
 
 function readViewport() {
   if (!map) return;
@@ -381,7 +407,9 @@ onMounted(() => {
   });
   // No NavigationControl: zoom lives in the toolbar, which drives this map
   // through `map/zoom.ts`.
-  attachMap(map);  // On `moveend`, not `move`: the budget only moves in powers of two, and
+  attachMap(map);
+  serveWeatherIcons(map, drawSymbols);
+  // On `moveend`, not `move`: the budget only moves in powers of two, and
   // resizing it mid-gesture would restart every trail (see `map/particles.ts`).
   map.on("moveend", () => {
     readViewport();
@@ -396,6 +424,7 @@ onMounted(() => {
     overlay = new MapLibreOverlay({ interleaved: true, layers: layers() });
     map!.addControl(overlay);
     refreshPlaces();
+    drawSymbols();
   });
 });
 

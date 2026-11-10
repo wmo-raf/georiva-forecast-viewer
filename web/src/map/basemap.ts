@@ -60,6 +60,14 @@ export const DATA_ANCHOR_ID = "georiva-data-anchor";
  */
 export const PLACES_SOURCE_ID = "places";
 
+/**
+ * The towns with their weather symbols (`map/symbols.ts`), filled by
+ * `MapView.vue` from a Forti model's town forecasts. Declared empty, like the
+ * places, so the layer exists from the first frame and only its data changes.
+ */
+export const WEATHER_SYMBOLS_SOURCE_ID = "weather-symbols";
+export const WEATHER_SYMBOLS_LAYER_ID = "weather-symbols";
+
 const OPENFREEMAP = "https://tiles.openfreemap.org";
 
 /**
@@ -214,6 +222,10 @@ function places(classes: string[], [low, high]: [number | null, number | null]):
   if (high !== null) clauses.push(["<=", ["get", "rank"], high]);
   return ["all", ...clauses] as ExpressionSpecification;
 }
+
+/** Temperatures on the weather symbols: warm in Yr's red, below zero in blue, lightened for the dark ground. */
+const WARM = "#ff8a80";
+const COLD = "#82b1ff";
 
 /** Ranks sort the labels against each other, so the important name wins a collision. */
 const BY_RANK = { "symbol-sort-key": ["get", "rank"] as ExpressionSpecification };
@@ -701,6 +713,48 @@ const waterLabels: LayerSpecification[] = (
  * several hundred 404s on every pan — so "off" has to mean the style does not
  * know the tiles exist.
  */
+/**
+ * A town's weather, read like Yr's map: the symbol over the name, then the
+ * temperature and the wind with an arrow.
+ *
+ * One symbol per town, icon and text together, so MapLibre's collision hides
+ * a town whole and the gazetteer's rank decides who wins (`sort`, from
+ * `map/symbols.ts`). The icons are not in a sprite: `map/weatherIcons.ts`
+ * supplies each one on `styleimagemissing`. A town with no symbol code keeps
+ * its text — `icon-image` resolves to nothing, which MapLibre draws as no icon.
+ */
+const weatherSymbols: LayerSpecification = {
+  id: WEATHER_SYMBOLS_LAYER_ID,
+  type: "symbol",
+  source: WEATHER_SYMBOLS_SOURCE_ID,
+  layout: {
+    "icon-image": ["case", ["has", "symbol"], ["concat", "yr:", ["get", "symbol"]], ""],
+    "icon-anchor": "bottom",
+    "text-anchor": "top",
+    "text-font": REGULAR,
+    "text-size": byZoom([
+      [4, 11],
+      [10, 14],
+    ]),
+    "text-max-width": 10,
+    "text-field": [
+      "format",
+      ["get", "name"],
+      {},
+      "\n",
+      {},
+      ["coalesce", ["get", "temperature"], ""],
+      { "text-color": ["case", ["has", "cold"], COLD, WARM] },
+      " ",
+      {},
+      ["coalesce", ["get", "wind"], ""],
+      { "font-scale": 0.9 },
+    ],
+    "symbol-sort-key": ["get", "sort"],
+  },
+  paint: textPaint,
+};
+
 export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } = {}): StyleSpecification {
   return {
     version: 8,
@@ -708,6 +762,7 @@ export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } =
     sources: {
       openmaptiles: { type: "vector", url: `${OPENFREEMAP}/planet` },
       [PLACES_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      [WEATHER_SYMBOLS_SOURCE_ID]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
       ...(shoreShadow
         ? {
             "shore-shadow": {
@@ -727,6 +782,7 @@ export function greyBasemap({ shoreShadow = false }: { shoreShadow?: boolean } =
       ...boundaries,
       ...placeLabels,
       ...waterLabels,
+      weatherSymbols,
     ],
   };
 }

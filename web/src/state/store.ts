@@ -9,8 +9,9 @@
 
 import { computed, reactive, shallowRef, watch } from "vue";
 import { encodedPreviewUrl, vectorPreviewUrl } from "../api/addresses";
-import { loadCatalogue, loadEdr, loadRuns } from "../api/client";
-import type { Catalogue, EdrCollection, EdrParameter, Quantity, Source } from "../api/types";
+import { loadCatalogue, loadEdr, loadPlaces, loadRuns } from "../api/client";
+import type { Catalogue, EdrCollection, EdrParameter, PlacesMatrix, Quantity, Source } from "../api/types";
+import { symbolsAt, symbolsAvailability } from "../map/symbols";
 import { drawnParameter, type Frame } from "./drawn";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
 import { buildTimeline, stepIndex, type Timeline } from "./timeline";
@@ -21,6 +22,7 @@ import {
   type PressureSettings,
 } from "./pressureSettings";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
+import { loadSymbolsSettings, saveSymbolsSettings, type SymbolsSettings } from "./symbolsSettings";
 
 export type Status = "loading" | "ready" | "empty" | "error";
 
@@ -49,6 +51,12 @@ interface State {
    * pressure binding.
    */
   pressure: PressureSettings;
+  /** Whether the weather symbols are switched on, remembered between visits. */
+  symbols: SymbolsSettings;
+  /** The selected source's symbols model's town forecasts, once loaded. */
+  symbolsMatrix: PlacesMatrix | null;
+  symbolsLoading: boolean;
+  symbolsFailed: boolean;
 }
 
 const state = reactive<State>({
@@ -64,6 +72,10 @@ const state = reactive<State>({
   playing: false,
   wind: loadWindSettings(),
   pressure: loadPressureSettings(),
+  symbols: loadSymbolsSettings(),
+  symbolsMatrix: null,
+  symbolsLoading: false,
+  symbolsFailed: false,
 });
 
 watch(
@@ -74,6 +86,11 @@ watch(
 watch(
   () => ({ ...state.pressure }),
   (settings) => savePressureSettings(settings),
+);
+
+watch(
+  () => ({ ...state.symbols }),
+  (settings) => saveSymbolsSettings(settings),
 );
 
 /** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
@@ -216,6 +233,62 @@ const pressureTextureUrl = computed(() => {
   return encodedPreviewUrl(org, source.value, pressure.variable, time.value, run.value.reference_time, pressure.version);
 });
 
+/** The Forti model the selected source's symbols come from; blank for none. */
+const symbolsModel = computed(() => source.value?.symbols_model ?? "");
+
+/** Whether the symbols may be drawn over the selected run, and if not, why not. */
+const symbols = computed(() =>
+  symbolsAvailability({
+    model: symbolsModel.value,
+    run: run.value?.reference_time ?? null,
+    matrix: state.symbolsMatrix,
+    loading: state.symbolsLoading,
+    failed: state.symbolsFailed,
+  }),
+);
+
+/**
+ * The towns the map should draw symbols for at the step on screen, or null
+ * when no symbols are drawn — switched off, none for this source, another run
+ * selected — in which case the basemap's own place names stay up.
+ */
+const symbolsToDraw = computed(() => {
+  if (!state.symbols.on || symbols.value.state !== "ready") return null;
+  const collection = symbolsAt(state.symbolsMatrix, time.value);
+  return collection.features.length ? collection : null;
+});
+
+/**
+ * Load the symbols model's town forecasts: once per model, and again whenever
+ * the source's runs are reloaded, which is when a newer run may have arrived.
+ * An answer for a model the user has since left is dropped.
+ */
+async function loadSymbols(model: string) {
+  state.symbolsLoading = true;
+  state.symbolsFailed = false;
+  try {
+    const matrix = await loadPlaces(model);
+    if (symbolsModel.value !== model) return;
+    state.symbolsMatrix = matrix;
+  } catch {
+    if (symbolsModel.value === model) state.symbolsFailed = true;
+  } finally {
+    if (symbolsModel.value === model) state.symbolsLoading = false;
+  }
+}
+
+watch(
+  () => [symbolsModel.value, state.symbols.on, state.timelineFor] as const,
+  ([model, on], previous) => {
+    if (!model || !on) return;
+    const sameModel = previous?.[0] === model && state.symbolsMatrix?.model === model;
+    // Switching on again, or a quantity switch within the source, keeps what is loaded.
+    if (sameModel && previous?.[2] === state.timelineFor) return;
+    void loadSymbols(model);
+  },
+  { immediate: true },
+);
+
 async function load() {
   state.status = "loading";
   try {
@@ -289,6 +362,19 @@ function pickRun(referenceTime: string) {
   }
 }
 
+function setSymbols(on: boolean) {
+  state.symbols.on = on;
+}
+
+/** Select the run the symbols were built from, if the timeline has it; whether it did. */
+function showSymbolsRun(): boolean {
+  const wanted = state.symbolsMatrix?.reference_time;
+  const match = wanted ? state.timeline?.runs.find((r) => Date.parse(r.reference_time) === Date.parse(wanted)) : undefined;
+  if (!match) return false;
+  pickRun(match.reference_time);
+  return true;
+}
+
 function step(delta: number) {
   state.step = stepIndex(state.step, times.value.length, delta);
 }
@@ -327,6 +413,9 @@ export function useViewer() {
     textureUrl,
     windTextureUrl,
     pressureTextureUrl,
+    symbolsModel,
+    symbols,
+    symbolsToDraw,
     load,
     pickQuantity,
     pickSource,
@@ -337,5 +426,7 @@ export function useViewer() {
     setWind,
     resetWind,
     setPressure,
+    setSymbols,
+    showSymbolsRun,
   };
 }

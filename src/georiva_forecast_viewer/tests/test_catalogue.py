@@ -65,6 +65,7 @@ class CatalogueTests(TestCase):
                             "collection": "ecmwf-ifs",
                             "variable": "t2m",
                             "descriptor": "",
+                            "symbols_model": "",
                             "version": ANY,
                         },
                         {
@@ -74,6 +75,7 @@ class CatalogueTests(TestCase):
                             "collection": "wrf-3km",
                             "variable": "t2",
                             "descriptor": "",
+                            "symbols_model": "",
                             "version": ANY,
                         },
                     ],
@@ -96,6 +98,27 @@ class CatalogueTests(TestCase):
 
         [quantity] = self._quantities()
         self.assertEqual(quantity["decimals"], 1)
+
+    def test_a_source_names_the_forecast_model_its_weather_symbols_come_from(self):
+        """The Forti model a source's symbol layer reads (``/api/forecast/{model}/places/``).
+
+        Configured, not discovered: Forti does not say which collection a model
+        is published from (its D17), so the operator who binds the source says
+        which model goes with it.
+        """
+        temperature = make_quantity("t2m")
+        ifs = make_source(make_collection("ecmwf-ifs"), slug="ifs", symbols_model="ecmwf-ifs")
+        bind(ifs, temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["sources"][0]["symbols_model"], "ecmwf-ifs")
+
+    def test_a_source_with_no_symbols_model_says_so_with_a_blank(self):
+        temperature = make_quantity("t2m")
+        bind(make_source(make_collection("ecmwf-ifs"), slug="ifs"), temperature, variable="t2m")
+
+        [quantity] = self._quantities()
+        self.assertEqual(quantity["sources"][0]["symbols_model"], "")
 
     def test_an_unset_icon_and_descriptor_are_blank_strings(self):
         temperature = make_quantity("t2m")
