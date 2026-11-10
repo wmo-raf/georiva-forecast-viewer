@@ -36,8 +36,8 @@ export function highLowRadiusKm([west, south, east, north]: readonly [number, nu
   return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, radius));
 }
 
-/** The smoothed field's grid as a share of the H/L radius; tuned by eye against IFS and a WRF domain. */
-const RADII_PER_SMOOTHED_CELL = 15;
+/** How many smoothed cells span one H/L radius; tuned by eye against IFS and a WRF domain. */
+const SMOOTHED_CELLS_PER_RADIUS = 15;
 
 /**
  * The layers' `imageSmoothing` for the pressure texture: how many texture rows
@@ -57,7 +57,7 @@ const RADII_PER_SMOOTHED_CELL = 15;
 export function pressureSmoothing(bounds: readonly [number, number, number, number], heightPx: number): number {
   if (heightPx <= 0) return 0;
   const rowKm = ((bounds[3] - bounds[1]) * KM_PER_DEGREE) / heightPx;
-  const targetKm = highLowRadiusKm(bounds) / RADII_PER_SMOOTHED_CELL;
+  const targetKm = highLowRadiusKm(bounds) / SMOOTHED_CELLS_PER_RADIUS;
   return Math.max(0, Math.round(targetKm / rowKm) - 1);
 }
 

@@ -63,7 +63,7 @@ export interface Source {
  */
 export interface PressureOverlay {
   variable: string;
-  /** Isobar spacing, in the texture's unit; every fifth line is major. */
+  /** Isobar spacing, in the texture's unit; every line is drawn alike. */
   interval: number;
   /** Multiply a texture value by this to get hPa. */
   to_hpa: number;
