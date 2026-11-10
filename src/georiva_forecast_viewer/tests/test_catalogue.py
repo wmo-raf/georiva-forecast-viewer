@@ -260,13 +260,26 @@ class PressureOverlayTests(TestCase):
         give_unit(self.ifs.collection, "msl", "Pa")
         bind(self.ifs, make_pressure_quantity(interval_hpa=4), variable="msl")
 
-        self.assertEqual(self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 400.0, "to_hpa": 0.01})
+        self.assertEqual(
+            self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 400.0, "to_hpa": 0.01, "version": ANY}
+        )
+
+    def test_the_overlay_carries_its_own_variables_render_config_token(self):
+        """Its texture is msl's, so its ``v=`` must be msl's token, not the token of the raster it is drawn over."""
+        msl = give_unit(self.ifs.collection, "msl", "Pa")
+        bind(self.ifs, make_quantity("t2m"), variable="t2m")
+        bind(self.ifs, make_pressure_quantity(), variable="msl")
+
+        listed = self._sources()["ifs"]
+        self.assertEqual(listed["pressure"]["version"], render_config_token(msl))
 
     def test_a_source_already_in_hpa_draws_the_interval_as_set(self):
         give_unit(self.ifs.collection, "msl", "hPa")
         bind(self.ifs, make_pressure_quantity(interval_hpa=2), variable="msl")
 
-        self.assertEqual(self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 2.0, "to_hpa": 1.0})
+        self.assertEqual(
+            self._sources()["ifs"]["pressure"], {"variable": "msl", "interval": 2.0, "to_hpa": 1.0, "version": ANY}
+        )
 
     def test_the_overlay_rides_on_the_source_under_every_quantity(self):
         """It is drawn over whatever raster is picked, so whichever listing the web reads must carry it."""

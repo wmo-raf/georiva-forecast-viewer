@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * The map toolbar, in the corner column between the model picker and the
- * legend: zoom in, zoom out, wind and full screen, in one row at its own
- * width, right-aligned: a fixed step per tool, up to the column's width.
+ * legend: zoom in, zoom out, wind, pressure and full screen, in one row at its
+ * own width, right-aligned: a fixed step per tool, up to the column's width.
  *
  * Wind is the toolbar's alone — the rail lists scalar quantities only. Its
  * button says whether wind is drawn (accent when on, muted when off) and opens
@@ -11,11 +11,16 @@
  * leaves it open so the map can be watched as it changes. A model with no wind
  * disables the button and closes the dropup.
  *
+ * Pressure follows the same pattern: a button (accent while isobars or H/L are
+ * drawn) opening a dropup with the two switches and nothing else — interval,
+ * colour and radius are the operator's or the map's. A model with no pressure
+ * binding disables it. One dropup is open at a time.
+ *
  * Full screen covers the whole page, chrome included, and is left out where
  * the browser has no Fullscreen API (Safari on iPhone) rather than shown as a
  * button that can never work.
  */
-import { ChevronUp, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
+import { ChevronUp, Gauge, Maximize, Minimize, Minus, Plus, Wind } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useZoom } from "../map/zoom";
 import { useViewer } from "../state/store";
@@ -30,20 +35,41 @@ const root = ref<HTMLElement | null>(null);
 const windAvailable = computed(() => viewer.windBinding.value !== null);
 const windOn = computed(() => viewer.state.wind.on && windAvailable.value);
 const settings = computed(() => viewer.state.wind);
-const windOpen = ref(false);
+/** The dropup that is open, if any: one at a time, so they never stack over each other. */
+const open = ref<"wind" | "pressure" | null>(null);
+const windOpen = computed(() => open.value === "wind");
+const pressureOpen = computed(() => open.value === "pressure");
+
+function toggle(which: "wind" | "pressure") {
+  open.value = open.value === which ? null : which;
+}
 
 watch(windAvailable, (available) => {
-  if (!available) windOpen.value = false;
+  if (!available && windOpen.value) open.value = null;
 });
 
 function closeOnOutsidePress(event: PointerEvent) {
-  if (root.value && !root.value.contains(event.target as Node)) windOpen.value = false;
+  if (root.value && !root.value.contains(event.target as Node)) open.value = null;
 }
 
-watch(windOpen, (open) => {
-  if (open) document.addEventListener("pointerdown", closeOnOutsidePress, true);
+watch(open, (current) => {
+  if (current) document.addEventListener("pointerdown", closeOnOutsidePress, true);
   else document.removeEventListener("pointerdown", closeOnOutsidePress, true);
 });
+
+// ---- pressure ----
+
+const pressureAvailable = computed(() => viewer.pressureBinding.value !== null);
+const pressure = computed(() => viewer.state.pressure);
+const pressureOn = computed(() => pressureAvailable.value && (pressure.value.isobars || pressure.value.highLow));
+
+watch(pressureAvailable, (available) => {
+  if (!available && pressureOpen.value) open.value = null;
+});
+
+function setPressureSwitch(key: "isobars" | "highLow", event: Event) {
+  viewer.setPressure({ [key]: (event.target as HTMLInputElement).checked });
+}
 
 function setNumber(key: "speed" | "width" | "life", event: Event) {
   viewer.setWind({ [key]: Number((event.target as HTMLInputElement).value) });
@@ -85,14 +111,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="tools" @keydown.escape="windOpen = false">
-    <div v-if="windOpen" id="wind-panel" class="wind" role="group" aria-label="Wind settings">
-      <label class="wind__row wind__row--switch">
-        <span class="wind__title">Wind</span>
+  <div ref="root" class="tools" @keydown.escape="open = null">
+    <div v-if="windOpen" id="wind-panel" class="dropup" role="group" aria-label="Wind settings">
+      <label class="dropup__switch-row">
+        <span class="dropup__title">Wind</span>
         <input
           type="checkbox"
           role="switch"
-          class="wind__switch"
+          class="switch"
           :checked="settings.on"
           @change="viewer.setWind({ on: ($event.target as HTMLInputElement).checked })"
         />
@@ -164,6 +190,30 @@ onBeforeUnmount(() => {
       <button type="button" class="wind__reset" @click="viewer.resetWind()">Reset</button>
     </div>
 
+    <div v-if="pressureOpen" id="pressure-panel" class="dropup" role="group" aria-label="Pressure overlay">
+      <span class="dropup__title dropup__heading">Pressure</span>
+      <label class="dropup__switch-row dropup__switch-row--plain">
+        <span>Isobars</span>
+        <input
+          type="checkbox"
+          role="switch"
+          class="switch"
+          :checked="pressure.isobars"
+          @change="setPressureSwitch('isobars', $event)"
+        />
+      </label>
+      <label class="dropup__switch-row dropup__switch-row--plain">
+        <span>Highs and lows</span>
+        <input
+          type="checkbox"
+          role="switch"
+          class="switch"
+          :checked="pressure.highLow"
+          @change="setPressureSwitch('highLow', $event)"
+        />
+      </label>
+    </div>
+
     <div class="tools__bar" role="toolbar" aria-label="Map tools">
       <button
         type="button"
@@ -187,19 +237,39 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="tools__button tools__button--wind"
+        class="tools__button tools__button--dropup"
         :class="{ 'tools__button--active': windOn }"
         :title="windAvailable ? 'Wind settings' : 'This model has no wind data'"
         aria-label="Wind settings"
         :aria-expanded="windOpen"
         aria-controls="wind-panel"
         :disabled="!windAvailable"
-        @click="windOpen = !windOpen"
+        @click="toggle('wind')"
       >
         <Wind :size="16" :stroke-width="1.75" aria-hidden="true" />
         <ChevronUp
           class="tools__caret"
           :class="{ 'tools__caret--open': windOpen }"
+          :size="12"
+          :stroke-width="2"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        class="tools__button tools__button--dropup"
+        :class="{ 'tools__button--active': pressureOn }"
+        :title="pressureAvailable ? 'Pressure overlay' : 'This model has no pressure overlay'"
+        aria-label="Pressure overlay"
+        :aria-expanded="pressureOpen"
+        aria-controls="pressure-panel"
+        :disabled="!pressureAvailable"
+        @click="toggle('pressure')"
+      >
+        <Gauge :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <ChevronUp
+          class="tools__caret"
+          :class="{ 'tools__caret--open': pressureOpen }"
           :size="12"
           :stroke-width="2"
           aria-hidden="true"

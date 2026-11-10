@@ -12,6 +12,7 @@ const viewer = useViewer();
 const frameReady = ref(false);
 const rasterError = ref<string | null>(null);
 const windError = ref<string | null>(null);
+const pressureError = ref<string | null>(null);
 
 /** Every failure that leaves the map standing, as one floating notice. */
 const warnings = computed(() =>
@@ -19,6 +20,7 @@ const warnings = computed(() =>
     viewer.state.sourceError ? `This model could not be loaded: ${viewer.state.sourceError}` : null,
     rasterError.value ? `Texture failed: ${rasterError.value}` : null,
     windError.value ? `Wind failed: ${windError.value}` : null,
+    pressureError.value ? `Pressure failed: ${pressureError.value}` : null,
   ].filter((message): message is string => message !== null),
 );
 
@@ -33,6 +35,7 @@ onMounted(viewer.load);
       @frame-ready="frameReady = $event"
       @raster-error="rasterError = $event"
       @wind-error="windError = $event"
+      @pressure-error="pressureError = $event"
     />
     <div v-if="viewer.state.status === 'error'" class="notice notice--error">{{ viewer.state.error }}</div>
     <div v-else-if="viewer.state.status === 'empty'" class="notice">Nothing is configured for this viewer yet.</div>

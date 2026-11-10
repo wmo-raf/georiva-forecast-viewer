@@ -50,6 +50,14 @@ GeoRiva's process and talks to it over public HTTP routes only.
   it — raster tiles rendered from Natural Earth and shipped inside the bundle
   ([`docs/shore-shadow.md`](docs/shore-shadow.md)). Everything the viewer draws
   comes from GeoRiva or OpenFreeMap; no other host is reached.
+- **Pressure overlay** — also a setting: which scalar quantity is mean sea level
+  pressure, and the isobar interval in hPa (4 by default; every fifth line is
+  drawn bolder). It is drawn as isobars and highs/lows over *any* raster, the
+  way wind is, from each source's own binding of that quantity; the quantity
+  stays in the rail as an ordinary raster too. Every variable bound to it must
+  be stored in a pressure unit — the setting and the binding both refuse one
+  that is not. Users switch isobars and highs/lows on from the toolbar; both
+  start off.
 
 Admin: *Forecast viewer → Quantities / Sources* (bindings inline on a source),
 and *Settings → Forecast viewer settings*.
@@ -61,7 +69,8 @@ and *Settings → Forecast viewer settings*.
   "config": {"org": "kmd", "org_name": "KMD", "default_view": {"center": [20.0, 0.0], "zoom": 3.0}},
   "quantities": [
     {"slug": "t2m", "name": "2 m temperature", "kind": "scalar", "sources": [
-      {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m"},
+      {"slug": "ifs", "name": "ECMWF IFS", "catalog": "models", "collection": "ecmwf-ifs", "variable": "t2m",
+       "pressure": {"variable": "msl", "interval": 400.0, "to_hpa": 0.01, "version": "…"}},
       {"slug": "wrf", "name": "KMD WRF", "catalog": "models", "collection": "wrf-3km", "variable": "t2"}
     ]},
     {"slug": "wind10", "name": "10 m wind", "kind": "vector", "sources": [
@@ -76,6 +85,15 @@ A source on a collection the caller may not see is absent, not forbidden
 organisation, `internal` for nobody. A quantity with no visible source is
 absent with it. Runs, lead times and render hints are not here: the web reads
 them from core's `/api/runs/…` and `/api/edr/collections/…` routes.
+
+`pressure` rides on every listing of a source that binds the organisation's
+pressure quantity, and is absent otherwise. The web stays unit-blind:
+`interval` is already in the texture's unit (here msl is stored in Pa, so 4 hPa
+is 400), `to_hpa` is the one factor an H/L label needs, and `version` is the
+pressure variable's own render-config token for its texture's `v=`. A variable
+whose unit stops being a pressure after it was bound (a unit is core's to edit)
+drops the overlay for that source with a logged warning; the route still
+answers.
 
 ## Development
 

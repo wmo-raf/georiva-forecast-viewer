@@ -112,7 +112,9 @@ def pressure_by_source(request, organisation):
     if settings.pressure_quantity_id is None:
         return {}
     overlays = {}
-    for binding in visible_bindings(request).filter(quantity_id=settings.pressure_quantity_id):
+    for binding in (
+        visible_bindings(request).filter(quantity_id=settings.pressure_quantity_id).select_related("variable__unit")
+    ):
         described = describe_pressure(binding.variable, settings.isobar_interval_hpa)
         if described is None:
             logger.warning(

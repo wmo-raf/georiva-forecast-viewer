@@ -14,6 +14,12 @@ import type { Catalogue, EdrCollection, EdrParameter, Quantity, Source } from ".
 import { drawnParameter, type Frame } from "./drawn";
 import { initialSelection, selectQuantity, selectSource, sourceOf, type Selection } from "./selection";
 import { buildTimeline, stepIndex, type Timeline } from "./timeline";
+import {
+  loadPressureSettings,
+  pressureWanted,
+  savePressureSettings,
+  type PressureSettings,
+} from "./pressureSettings";
 import { DEFAULT_WIND, loadWindSettings, saveWindSettings, type WindSettings } from "./windSettings";
 
 export type Status = "loading" | "ready" | "empty" | "error";
@@ -37,6 +43,12 @@ interface State {
    * visits. `on` is drawn only when the selected source has a wind binding.
    */
   wind: WindSettings;
+  /**
+   * Which parts of the pressure overlay are drawn, from the toolbar's dropup
+   * and remembered between visits. Drawn only when the selected source has a
+   * pressure binding.
+   */
+  pressure: PressureSettings;
 }
 
 const state = reactive<State>({
@@ -51,11 +63,17 @@ const state = reactive<State>({
   step: 0,
   playing: false,
   wind: loadWindSettings(),
+  pressure: loadPressureSettings(),
 });
 
 watch(
   () => ({ ...state.wind }),
   (settings) => saveWindSettings(settings),
+);
+
+watch(
+  () => ({ ...state.pressure }),
+  (settings) => savePressureSettings(settings),
 );
 
 /** One source's identity across the catalogue: a quantity switch to the same collection keeps its timeline. */
@@ -97,6 +115,16 @@ const windBinding = computed<Source | null>(() => {
 
 /** The wind binding the map should draw: the toggle is on and the source has one. Null otherwise. */
 const windToDraw = computed<Source | null>(() => (state.wind.on ? windBinding.value : null));
+
+/**
+ * The selected source's pressure overlay, if the organisation named one and
+ * this source binds it. Every listing of a source carries it, so the selected
+ * scalar's listing is enough.
+ */
+const pressureBinding = computed(() => source.value?.pressure ?? null);
+
+/** The overlay the map should fetch: something is switched on and the source has one. Null otherwise. */
+const pressureToDraw = computed(() => (pressureWanted(state.pressure) ? pressureBinding.value : null));
 
 /** False from the moment the source changes until its own timeline has landed. */
 const timelineCurrent = computed(() => !!source.value && state.timelineFor === keyOf(source.value));
@@ -172,6 +200,28 @@ const windTextureUrl = computed(() => {
   return vectorPreviewUrl(org, wind, time.value, run.value.reference_time);
 });
 
+/**
+ * The pressure variable's texture for the same run and step as the raster.
+ *
+ * Keyed by the pressure variable's own token, not the source's: the source
+ * listing's `version` is the selected scalar's, and an immutable reply cached
+ * under it would keep msl at a range it no longer has. When msl is itself the
+ * selected raster, this is the raster's URL, and the browser's cache answers
+ * the second fetch.
+ */
+const pressureTextureUrl = computed(() => {
+  const org = state.catalogue?.config.org;
+  const pressure = pressureToDraw.value;
+  if (!org || !source.value || !pressure || !time.value || !run.value) return null;
+  return encodedPreviewUrl(
+    org,
+    { ...source.value, version: pressure.version },
+    pressure.variable,
+    time.value,
+    run.value.reference_time,
+  );
+});
+
 async function load() {
   state.status = "loading";
   try {
@@ -233,6 +283,11 @@ function resetWind() {
   state.wind = { ...DEFAULT_WIND };
 }
 
+/** Changes some of the pressure switches. */
+function setPressure(changes: Partial<PressureSettings>) {
+  Object.assign(state.pressure, changes);
+}
+
 function pickRun(referenceTime: string) {
   if (state.timeline?.runs.some((r) => r.reference_time === referenceTime)) {
     state.timeline.selected = referenceTime;
@@ -262,6 +317,8 @@ export function useViewer() {
     source,
     windBinding,
     windToDraw,
+    pressureBinding,
+    pressureToDraw,
     timelineCurrent,
     loading,
     stalled,
@@ -275,6 +332,7 @@ export function useViewer() {
     shownParameter,
     textureUrl,
     windTextureUrl,
+    pressureTextureUrl,
     load,
     pickQuantity,
     pickSource,
@@ -284,5 +342,6 @@ export function useViewer() {
     setPlaying,
     setWind,
     resetWind,
+    setPressure,
   };
 }

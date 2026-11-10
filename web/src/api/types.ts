@@ -49,6 +49,26 @@ export interface Source {
    * different URL (ADR 0021). Minted by the plugin, never by the web.
    */
   version: string;
+  pressure?: PressureOverlay;
+}
+
+/**
+ * A source's pressure overlay: the variable drawn as isobars and highs/lows
+ * over whatever raster is selected. Present on every listing of a source that
+ * has one, absent otherwise.
+ *
+ * Unit-blind by design: `interval` is already in the texture's own unit, and
+ * `to_hpa` is the one factor an H/L label needs. Both come from the server,
+ * which knows the variable's stored unit; the web never converts.
+ */
+export interface PressureOverlay {
+  variable: string;
+  /** Isobar spacing, in the texture's unit; every fifth line is major. */
+  interval: number;
+  /** Multiply a texture value by this to get hPa. */
+  to_hpa: number;
+  /** The pressure variable's own render-config token: its texture's `v=`, not the source's. */
+  version: string;
 }
 
 /** `GET /api/runs/<catalog>/<collection>/` */

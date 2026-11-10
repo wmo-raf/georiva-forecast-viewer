@@ -10,6 +10,7 @@ back into hPa for an H/L label.
 
 import pint
 
+from georiva.core.machine_plane.addresses import render_config_token
 from georiva.core.unit_utils import ureg
 
 
@@ -30,8 +31,19 @@ def hpa_per_unit(variable):
 
 
 def describe_pressure(variable, interval_hpa):
-    """What the web needs to draw ``variable`` as isobars, or ``None`` if it cannot be."""
+    """What the web needs to draw ``variable`` as isobars, or ``None`` if it cannot be.
+
+    ``version`` is the variable's own render-config token, the ``v=`` its
+    texture URL must carry (ADR 0021). The source's ``version`` beside it is
+    the token of whichever variable that listing is for, and keying the
+    pressure texture by it would cache msl against another variable's range.
+    """
     factor = hpa_per_unit(variable)
     if not factor:
         return None
-    return {"variable": variable.slug, "interval": interval_hpa / factor, "to_hpa": factor}
+    return {
+        "variable": variable.slug,
+        "interval": interval_hpa / factor,
+        "to_hpa": factor,
+        "version": render_config_token(variable),
+    }
