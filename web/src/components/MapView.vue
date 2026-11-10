@@ -98,16 +98,27 @@ const ISOBARS = {
 };
 
 /**
- * Highs and lows: white, larger than the layer's default, with a thin dark
- * outline so a label holds up over a near-white raster (precipitation) as
- * well as a dark one. The layer draws the letter at 1.2× `textSize` and the
+ * Highs and lows: white, larger than the layer's default, with a heavy dark
+ * stroke so a label holds up over trails and a light raster as well as a
+ * dark one. The layer draws the letter at 1.2× `textSize` and the
  * value at `textSize`; that ratio is not a prop.
+ *
+ * The stroke needs the font atlas widened. deck.gl measures an SDF outline in
+ * the 64 px atlas, not on screen, and only as far as the atlas pads each glyph
+ * (4 px by default) — about 1 px at this size whatever the width asked for —
+ * and the layer hard-codes its sublayers' `fontSettings`. So both label
+ * sublayers, `type` (the letter) and `value`, get a wider pad and distance
+ * field through `_subLayerProps`, deck.gl's documented override for a
+ * composite layer's children: an outline of 10 against a radius of 16 reaches
+ * about 7.5 atlas px past the glyph, ~2 px on screen, inside the 10 px pad.
  */
+const LABEL_FONT = { sdf: true, buffer: 10, radius: 16 };
 const HIGH_LOW = {
   textSize: 16,
   textColor: [255, 255, 255, 255] as [number, number, number, number],
-  textOutlineWidth: 1,
-  textOutlineColor: [0, 0, 0, 153] as [number, number, number, number],
+  textOutlineWidth: 10,
+  textOutlineColor: [0, 0, 0, 204] as [number, number, number, number],
+  _subLayerProps: { type: { fontSettings: LABEL_FONT }, value: { fontSettings: LABEL_FONT } },
 };
 
 const props = defineProps<{ config: ViewerConfig }>();
