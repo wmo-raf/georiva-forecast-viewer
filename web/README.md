@@ -11,7 +11,7 @@ into `../src/georiva_forecast_viewer/static/forecast_viewer/` on release, where
 |---|---|
 | Quantities, sources, map config | `GET /api/forecast-viewer/` (the plugin) |
 | Which runs are complete, which is latest | `GET /api/runs/<catalog>/<collection>/` |
-| Each run's valid times, palette, unit, unscale range | `GET /api/edr/collections/<collection>/` |
+| Each run's valid times, unit, and render contract (colour table, encoding curve, legend, unscale range) | `GET /api/edr/collections/<collection>/` |
 | One step's value-encoded texture | `GET /titiler/<org>/<catalog>/<collection>/<variable>/encoded-preview.png?time=&reftime=` |
 | One step's wind pair, as two bands | `GET /titiler/<org>/<catalog>/<collection>/vector-preview.png?u_variable=&v_variable=&time=&reftime=` |
 
@@ -68,7 +68,8 @@ highs (`map/isobars.ts`, fixed rather than the operator's) — and the H/L
 labels take the same colours over a faint dark halo. The pastels are designed for
 rasters whose empty values are transparent or mid-tone; over a palette that
 paints "nothing" opaque white, as a precipitation palette starting at white
-does, they vanish, and the fix is that palette's lowest stop (`#ffffff00`). The rules that scale with the
+does, they vanish, and the fix is that style's lowest stop (`#ffffff00`) or a
+transparent under (core's #788). The rules that scale with the
 domain live in `map/highlow.ts` — the H/L search radius (2000 km for a global
 source, a quarter of a regional domain's shorter side) and the smoothing both
 layers apply before finding lines and centres (a grid about a fifteenth of that
@@ -101,9 +102,14 @@ of what this bundle fetches from outside GeoRiva, and a test in
 - Day strip (`DayStrip.vue`, `state/daystrip.ts`): one cell per UTC day of
   the run, the playhead at the step's hour of day, a floating label with the
   exact step, play and step buttons.
-- Legend (`Legend.vue`, `ui/legend.ts`): the palette as a bar with stop values
-  and the unit, placed over the `palette_min`/`palette_max` span EDR gives for
-  display — which is deliberately not the texture's encoding range.
+- Legend (`Legend.vue`, `ui/legend.ts`): core's own layout of the default style
+  (EDR's `legend`), drawn as given — a stepped style as equal blocks, a
+  continuous one along the encoding curve, the labels core picked, an arrow on
+  a clamped end only — beside the unit. A stepped legend's labels thin where the
+  pill is too narrow for them, as core's `legend.js` thins them.
+- Raster (`MapView.vue`, `map/colourTable.ts`): each code coloured from EDR's
+  `colour_table`, the table Titiler colours tiles with, under an identity
+  unscale; values under place names decoded through EDR's `encoding` curve.
 There is no hover readout. One was built and taken out again; what it was
 built on is still here, and the next section says why.
 

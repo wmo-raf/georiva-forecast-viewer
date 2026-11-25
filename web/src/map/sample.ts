@@ -7,17 +7,22 @@
  * colours (ADR 0021), so any feature that wants a number at a place needs no
  * request of its own to get one.
  *
- * The decode is the one the layer's own shader applies — `mix(low, high,
- * channel / 255)` against the response's `X-Image-Unscale` — which is what
- * makes a number agree with the colour drawn over it, and with the source
- * data: that expression was checked against both models' COGs in
- * `docs/wind-direction-check.md`.
+ * A scalar code is decoded as core decodes it (`colourTable.ts`): through the
+ * variable's encoding curve, over the response's `X-Image-Unscale`. That is
+ * what makes a number agree with the colour the table puts over it, and with
+ * every other GeoRiva readout of the same code. A value beyond the style's
+ * stops is still read where the map draws it transparent: the transparency is
+ * the style's choice of what to show, and the value is still the forecast's.
+ * A wind pair is linear, `mix(low, high, channel / 255)` — the expression
+ * checked against both models' COGs in `docs/wind-direction-check.md`.
  *
  * Nearest pixel, not interpolated. The texture is the model's own grid at
  * preview resolution, so a cell is the finest thing the model actually says,
  * and smoothing between cells would invent values the forecast does not make.
  */
 
+import type { Encoding } from "../api/types";
+import { decode } from "./colourTable";
 import { WORLD_SHIFTS } from "./longitude";
 import type { Texture } from "./texture";
 
@@ -82,10 +87,13 @@ function unscale(channel: number, [low, high]: readonly [number, number]): numbe
   return low + ((high - low) * channel) / 255;
 }
 
-/** The scalar quantity under a point, in the variable's own unit. */
-export function readValue(texture: Texture, lon: number, lat: number): number | null {
+/**
+ * The scalar quantity under a point, in the variable's served unit, decoded
+ * through `encoding`'s curve (linear where there is none).
+ */
+export function readValue(texture: Texture, lon: number, lat: number, encoding?: Encoding | null): number | null {
   const pixel = pixelAt(texture, lon, lat);
-  return pixel ? unscale(pixel.red, texture.unscale) : null;
+  return pixel ? decode(pixel.red, texture.unscale, encoding) : null;
 }
 
 /**

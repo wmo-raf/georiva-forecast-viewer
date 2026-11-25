@@ -16,7 +16,7 @@ function texture(
   bounds: Texture["bounds"] = [-180, -90, 180, 90],
   unscale: Texture["unscale"] = [0, 255],
 ): Texture {
-  return { image: { data: new Uint8ClampedArray(pixels.flat()), width, height }, bounds, unscale };
+  return { image: { data: new Uint8ClampedArray(pixels.flat()), width, height }, bounds, unscale, curve: "linear" };
 }
 
 const OPAQUE = 255;
@@ -83,6 +83,19 @@ describe("the value under a point", () => {
     expect(readValue(east, 535, 0)).toBe(11);
     expect(readValue(west, 185, 0)).toBe(22);
     expect(readValue(east, -185, 0)).toBe(11);
+  });
+
+  it("decodes the code through the variable's encoding curve, as core does", () => {
+    // A sqrt variable over 0–300: code 51 is (51/255)² of the range, 12, not the linear 60.
+    const rain = texture(1, 1, [[51, 0, 0, OPAQUE]], [-180, -90, 180, 90], [0, 300]);
+    expect(readValue(rain, 0, 0, { curve: "sqrt", range: [0, 300] })).toBeCloseTo(12);
+    expect(readValue(rain, 0, 0)).toBeCloseTo(60);
+  });
+
+  it("reads a value where the style draws nothing: transparency is the colour's, not the texture's", () => {
+    // Code 0 is below a style whose under is transparent; the texture still holds a value there.
+    const dry = texture(1, 1, [[0, 0, 0, OPAQUE]], [-180, -90, 180, 90], [0, 300]);
+    expect(readValue(dry, 0, 0, { curve: "sqrt", range: [0, 300] })).toBe(0);
   });
 });
 

@@ -133,12 +133,49 @@ export interface EdrRun {
 export interface EdrParameter {
   label: string;
   unit?: { symbol: string };
+  /**
+   * How core renders the variable (its render contract, wmo-raf/georiva #785–#812).
+   * The three the viewer draws with are optional only because a core older than
+   * 0.5.0 sends none of them; `renderContractGap` says which is missing.
+   */
   "x-georiva": {
+    /** The served range a code decodes over. */
     image_unscale: [number, number];
-    palette?: PaletteStop[];
-    palette_min?: number;
-    palette_max?: number;
+    /** The default style's 256 colours, one per code: what the raster is coloured with. */
+    colour_table?: ColourTable;
+    /** The curve a code was encoded through, over the stored range. */
+    encoding?: Encoding;
+    /** The default style laid out along a 0–1 bar. */
+    legend?: ServerLegend;
   };
+}
+
+export type Rgba = [number, number, number, number];
+
+/** 256 `[r, g, b, a]`, the colour of each code. */
+export type ColourTable = Rgba[];
+
+export interface Encoding {
+  curve: "linear" | "sqrt" | "log";
+  /** The stored range the codes were encoded over: a `log` code's fraction depends on it. */
+  range: [number, number];
+}
+
+/** What lies beyond an end of the style: its end colour, or nothing. */
+export type OutOfRange = "clamp" | "transparent";
+
+/** Core's `machine_plane/legend.py`: where each colour and value sits along the bar. */
+export interface ServerLegend {
+  /** `[position 0–1, [r, g, b, a]]`, in order. */
+  gradient: [number, Rgba][];
+  /** `[position 0–1, value served]`, in order. */
+  ticks: [number, number][];
+  /** Which ticks carry their value as text: the server's pick, never added to. */
+  labels?: number[];
+  /** Equal-width bands, whose labels may thin further where the bar is narrow. */
+  stepped?: boolean;
+  under: OutOfRange;
+  over: OutOfRange;
 }
 
 /** `[value, [r, g, b]]` or `[value, [r, g, b, a]]`, as WeatherLayers takes it. */

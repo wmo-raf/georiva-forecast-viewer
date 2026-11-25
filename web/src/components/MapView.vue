@@ -15,8 +15,8 @@
  *
  * All of them come from value-encoded textures derived per request (core's
  * ADR 0021): one band for the scalar and for pressure, two for the wind pair
- * (core's #593). Values, not colours: the palette from EDR is applied on the
- * GPU, so a palette change repaints rather than refetches, the wind's u and v
+ * (core's #593). Codes, not colours: the colour table from EDR is applied on the
+ * GPU, so a restyle repaints rather than refetches, the wind's u and v
  * survive the trip as numbers the particle layer can integrate, and isobars
  * and highs/lows are found in the pressure field itself.
  *
@@ -58,10 +58,11 @@ import { setWorkerUrl, type FilterSpecification, type GeoJSONSource } from "mapl
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
-import { ContourLayer, HighLowLayer, ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
+import { ContourLayer, HighLowLayer, ImageInterpolation, ImageType, ParticleLayer, RasterLayer } from "weatherlayers-gl";
 import type { PressureOverlay, ViewerConfig } from "../api/types";
 import type { Frame } from "../state/drawn";
 import { delayed } from "../ui/delayed";
+import { LAYER_UNSCALE, layerPalette, renderContractGap } from "../map/colourTable";
 import {
   DATA_ANCHOR_ID,
   PLACES_SOURCE_ID,
@@ -211,6 +212,14 @@ function pressureLayers() {
   const current = pressure.texture.value;
   const overlay = pressure.shows.value;
   if (!current || !overlay) return { isobars: [], highLow: [] };
+  // Contours and highs/lows read values, not colours, and take only a linear
+  // unscale: a pressure texture encoded through any other curve would put
+  // every isobar at the wrong pressure, so it is not drawn rather than drawn
+  // wrong. Pressure is linear in practice; this keeps that assumption in sight.
+  if (current.curve !== "linear") {
+    warnOnce(current, `pressure overlay not drawn: its texture is encoded through a ${current.curve} curve, and isobars need a linear one`);
+    return { isobars: [], highLow: [] };
+  }
   const settings = viewer.state.pressure;
   const common = {
     beforeId: DATA_ANCHOR_ID,
@@ -248,20 +257,39 @@ function pressureLayers() {
   };
 }
 
+/** Textures already warned about, so a repaint does not repeat the warning. */
+const warned = new WeakSet<Texture>();
+
+function warnOnce(texture: Texture, message: string) {
+  if (warned.has(texture)) return;
+  warned.add(texture);
+  console.warn(message);
+}
+
+/**
+ * The scalar raster is coloured as core colours it (wmo-raf/georiva #785):
+ * each code looked up in the default style's 256-entry colour table, the one
+ * Titiler colours tiles with, under an identity unscale. Never the stops over
+ * the value range — that read a `sqrt` or `log` texture as linear and drew a
+ * transparent under or over in its end colour. `LINEAR` because the layer's
+ * default, `CUBIC`, overshoots between neighbouring codes: it would soften a
+ * stepped style's edges and bleed a transparent end into the field beside it.
+ */
 function layers() {
   const current = raster.texture.value;
-  const palette = viewer.shownParameter.value?.["x-georiva"].palette;
+  const table = viewer.shownParameter.value?.["x-georiva"].colour_table;
   const { isobars, highLow } = pressureLayers();
-  if (!current || !palette) return [...isobars, ...windLayers(), ...highLow];
+  if (!current || !table) return [...isobars, ...windLayers(), ...highLow];
   return [
     new RasterLayer({
       id: LAYER_ID,
       beforeId: DATA_ANCHOR_ID,
       image: current.image,
       bounds: current.bounds,
-      imageUnscale: current.unscale,
+      imageUnscale: LAYER_UNSCALE,
+      imageInterpolation: ImageInterpolation.LINEAR,
       imageSmoothing: 0,
-      palette,
+      palette: layerPalette(table),
       opacity: 0.85,
       pickable: false,
     }),
@@ -328,7 +356,10 @@ follow(viewer.pressureTextureUrl, pressure, () => viewer.pressureToDraw.value);
 // its URL is null and the slot is never pending.
 const ready = computed(() => !raster.pending.value && !wind.pending.value && !pressure.pending.value);
 watch(ready, (value) => emit("frameReady", value), { immediate: true });
-watch(raster.error, (message) => emit("rasterError", message), { immediate: true });
+// A core too old to describe how it renders is said once, in place of the
+// raster, rather than drawn some other way (wmo-raf/georiva-forecast-viewer#34).
+const rasterProblem = computed(() => raster.error.value ?? renderContractGap(viewer.parameter.value));
+watch(rasterProblem, (message) => emit("rasterError", message), { immediate: true });
 watch(wind.error, (message) => emit("windError", message), { immediate: true });
 watch(pressure.error, (message) => emit("pressureError", message), { immediate: true });
 
@@ -375,7 +406,9 @@ function refreshPlaces() {
       .filter((place) => place.geometry.type !== "Point" || !spoken(...(place.geometry.coordinates as [number, number])));
     const texture = raster.texture.value;
     const current = texture && raster.shows.value?.of === selectedScalar.value ? texture : null;
-    const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat) : () => null;
+    // Decoded through the curve of the description the texture landed with.
+    const encoding = raster.shows.value?.parameter?.["x-georiva"].encoding;
+    const valueAt = current ? (lon: number, lat: number) => readValue(current, lon, lat, encoding) : () => null;
     target.setData(placesWithValues(features, valueAt, viewer.quantity.value?.decimals ?? 0));
   });
 }

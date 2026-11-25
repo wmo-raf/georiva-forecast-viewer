@@ -1,102 +1,79 @@
 /**
- * The legend, computed from what EDR says about the variable.
+ * The legend, drawn from the one core lays out (`x-georiva.legend`, core's
+ * `machine_plane/legend.py`, wmo-raf/georiva #790 and #812).
  *
- * The palette's stops carry their own data values (core's render contract), and
- * `palette_min`/`palette_max` beside them are the span to draw them over — a
- * display hint, deliberately not the texture's encoding range.
+ * Where each colour and each value sits along the bar is decided on the server,
+ * so the viewer's legend reads like the map and like every other GeoRiva
+ * legend: a continuous style laid out along the encoding curve, a stepped one
+ * as equal-width blocks with a value at each boundary. Which values carry text
+ * is the server's pick too, and this never adds to it. The one thing only the
+ * drawing can judge is whether the picked labels fit the bar it is drawn on, so
+ * a stepped legend's labels thin further here (`fitting`), as core's
+ * `legend.js` thins them; a continuous legend's are drawn as picked.
  *
- * A palette arrives in one of two shapes and the legend draws each as what it
- * is. Core's *stepped* mode expresses every class as two stops sharing its
- * boundaries, so that the hard edges survive any linear interpolation
- * downstream; folded back up here, that pairing is exactly the class list, and
- * the legend draws one block per class with the class's own lower boundary
- * printed on it. A *continuous* palette has no classes to name, so it keeps the
- * gradient and places a few labels along it at their true share of the range.
+ * An end arrow is drawn only where the end is clamped: values beyond it take
+ * the end colour. A transparent end has none, since those values are not drawn.
  *
- * Either way the colours are composited onto the legend's own backdrop before
- * they are used, so a class the map draws transparent still reads as a tint and
- * nothing — least of all the choice of text colour — depends on whatever the
- * map happens to be showing underneath.
+ * Colours are composited onto the legend's own backdrop before they decide
+ * anything, so a band the map draws transparent still reads as a tint and the
+ * choice of text colour never depends on what the map shows underneath.
  */
 
-import type { PaletteStop } from "../api/types";
+import type { Rgba, ServerLegend } from "../api/types";
 
 type Rgb = [number, number, number];
-type Rgba = [number, number, number, number];
-
-/** About this many labels along a continuous bar, taken from the stops. */
-const TICKS = 6;
-
-/**
- * At most this many values printed on a stepped bar; the rest are a title.
- * What the pill affords: it is a fixed 360px, so the ramp inside it is a little
- * over 300px, and a value at 11px wants about 26px of block to sit in without
- * touching its neighbour.
- */
-const MAX_LABELS = 12;
 
 /** `--fv-panel-solid`: what the pill is painted on, so alpha has a floor. */
 const BACKDROP: Rgb = [18, 26, 40];
 
-/** Relative luminance above which a block wants dark text rather than light. */
+/** Relative luminance above which a label wants dark text rather than light. */
 const DARK_TEXT_ABOVE = 0.55;
 
 const DARK_TEXT = "#111";
 const LIGHT_TEXT = "#fff";
 
-export interface LegendClass {
-  /** The class's lower boundary — the value its colour begins at. */
-  value: number;
-  /** The boundary as printed on the block, or null where the stride drops it. */
-  label: string | null;
-  /** The class's full range, for a block whose label the stride dropped. */
-  title: string;
-  /** The class colour, composited onto the backdrop, as CSS. */
-  colour: string;
-  /** Near-black or near-white, whichever reads on `colour`. */
-  textColour: string;
-}
+/** At most this many labels on a legend that does not say which to label, as core's `legend.js`. */
+const MAX_LABELS = 6;
 
-export interface Tick {
-  value: number;
-  /** The value as it is printed on the bar. */
-  label: string;
-  /** Percent across the bar, so a tick can sit on the colour it names. */
+/** Pixels of clear space between two neighbouring labels, as core's `legend.js`. */
+export const LABEL_GAP = 4;
+
+export interface LegendLabel {
+  /** The tick's index in the server's list, which is what thinning answers in. */
+  index: number;
+  text: string;
+  /** Percent along the bar. */
   at: number;
-  /** Near-black or near-white, whichever reads on the gradient there. */
+  /** How the label hangs off its point: the ends stay inside the bar. */
+  align: "start" | "middle" | "end";
+  /** Near-black or near-white, whichever reads on the bar there. */
   textColour: string;
 }
 
-/**
- * The top of the range, closing a stepped bar. It is the one boundary no class
- * begins at, so without it the scale never ends. It gets room of its own at the
- * end of the bar, carrying the last class's colour so that the class reads as
- * one band widened to hold its number: a block is far too narrow for a number,
- * and a label floating over the end would sit on the block before it.
- */
-export interface LegendEnd {
-  label: string;
-  /** The last class's colour, so the band runs on under the number. */
-  colour: string;
-  /** Near-black or near-white, whichever reads on it. */
-  textColour: string;
+export interface Legend {
+  /** The bar as a CSS gradient. */
+  gradient: string;
+  labels: LegendLabel[];
+  /** Whether the labels may thin where the bar is too narrow for them. */
+  stepped: boolean;
+  /** The arrow's colour at each end, or null where the end is transparent and has none. */
+  under: string | null;
+  over: string | null;
 }
 
-export type Legend =
-  | { kind: "stepped"; classes: LegendClass[]; end: LegendEnd }
-  | { kind: "continuous"; gradient: string; ticks: Tick[] };
-
 /**
- * A stop's value as a label: three significant figures is enough to tell two
- * stops apart, and a large value has no use for a decimal at all.
+ * A value as core's legends print it: up to two decimals, trailing zeros
+ * dropped (0.5, 1, 200, 26.85), and exponential where that would print nothing
+ * useful (0.00005, 250000).
  */
-function label(value: number): string {
-  return Math.abs(value) >= 100 ? value.toFixed(0) : Number(value.toPrecision(3)).toString();
+export function label(value: number): string {
+  const magnitude = Math.abs(value);
+  if (magnitude !== 0 && (magnitude < 0.01 || magnitude >= 1e5)) return value.toExponential(1);
+  return String(Number(value.toFixed(magnitude < 10 ? 2 : 1)));
 }
 
-/** A stop's colour as `[r, g, b, a]`, alpha defaulting to opaque. */
-function rgba([, channels]: PaletteStop): Rgba {
-  const [red, green, blue, alpha] = channels;
+function rgba(colour: number[]): Rgba {
+  const [red, green, blue, alpha] = colour;
   return [red, green, blue, alpha === undefined ? 255 : alpha];
 }
 
@@ -119,143 +96,98 @@ function luminance([red, green, blue]: Rgb): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** The text colour that reads on an (already composited) block colour. */
+/** The text colour that reads on an (already composited) colour. */
 function textOn(colour: Rgb): string {
   return luminance(colour) > DARK_TEXT_ABOVE ? DARK_TEXT : LIGHT_TEXT;
 }
 
-/** Sorted stops, which nothing upstream promises the snapshot arrives in. */
-function sorted(palette: PaletteStop[]): PaletteStop[] {
-  return [...palette].sort((a, b) => a[0] - b[0]);
-}
-
-interface Run {
-  colour: Rgba;
-  low: number;
-  high: number;
-}
-
-/** Consecutive stops of one colour, folded into the span they cover. */
-function runs(stops: PaletteStop[]): Run[] {
-  const folded: Run[] = [];
-  for (const stop of stops) {
-    const colour = rgba(stop);
-    const last = folded.at(-1);
-    if (last && last.colour.every((channel, i) => channel === colour[i])) {
-      last.high = stop[0];
-    } else {
-      folded.push({ colour, low: stop[0], high: stop[0] });
-    }
-  }
-  return folded;
-}
-
 /**
- * These runs as a class list, or null where they are a ramp rather than a
- * classification. A class covers a span of values, which is what core's stepped
- * mode produces and what a ramp — one stop per colour — never does.
- *
- * A run of no span at either end is dropped before that is judged. Palettes in
- * the wild close with the colour for everything above the top of the range,
- * declared as a single stop at that top; it names no interval, covers no area
- * on the map, and is a boundary of the classification rather than a class in
- * it. A ramp survives this untouched: dropping its ends only ever leaves the
- * interior stops, which have no span either.
+ * The bar's colour at `position`, between the gradient stops either side. At a
+ * stepped legend's boundary, where two stops share the position, it is the band
+ * the label sits at the start of — the one after the boundary — except at the
+ * very end, where only the last band is left.
  */
-function classification(folded: Run[]): Run[] | null {
-  let first = 0;
-  let last = folded.length - 1;
-  if (folded[first] && folded[first].high === folded[first].low) first += 1;
-  if (last >= first && folded[last].high === folded[last].low) last -= 1;
-  const classes = folded.slice(first, last + 1);
-  return classes.length > 0 && classes.every((run) => run.high > run.low) ? classes : null;
-}
-
-/** The colour of a ramp at `value`, interpolated between its bracketing stops. */
-function sample(stops: PaletteStop[], value: number): Rgba {
-  const after = stops.findIndex((stop) => stop[0] >= value);
-  if (after <= 0) return rgba(stops[after === 0 ? 0 : stops.length - 1]);
-  const [lowValue] = stops[after - 1];
-  const [highValue] = stops[after];
-  const low = rgba(stops[after - 1]);
-  const high = rgba(stops[after]);
-  const share = highValue === lowValue ? 0 : (value - lowValue) / (highValue - lowValue);
+function colourAt(gradient: [number, Rgba][], position: number): Rgba {
+  const after = gradient.findIndex(([at]) => at > position);
+  if (after === -1) return rgba(gradient[gradient.length - 1][1]);
+  if (after === 0) return rgba(gradient[0][1]);
+  const [lowAt, lowColour] = gradient[after - 1];
+  const [highAt, highColour] = gradient[after];
+  const low = rgba(lowColour);
+  const high = rgba(highColour);
+  const share = highAt === lowAt ? 0 : (position - lowAt) / (highAt - lowAt);
   return low.map((channel, i) => Math.round(channel + share * (high[i] - channel))) as Rgba;
 }
 
-/** One block per class, labelled on a stride so the numbers never collide. */
-function steppedLegend(folded: Run[], unit: string): Legend {
-  const every = Math.max(1, Math.ceil(folded.length / MAX_LABELS));
-  const suffix = unit ? ` ${unit}` : "";
-  const top = folded[folded.length - 1];
-  const topColour = composite(top.colour);
-  return {
-    kind: "stepped",
-    classes: folded.map((run, index) => {
-      const colour = composite(run.colour);
-      // The top of the range is drawn over the last class, so that class gives
-      // up its own boundary rather than show two numbers in one block. It is
-      // the boundary the stride is likeliest to have dropped anyway — unless
-      // the palette is a single class, which has the width for both.
-      const crowded = index === folded.length - 1 && folded.length > 1;
-      return {
-        value: run.low,
-        label: !crowded && index % every === 0 ? label(run.low) : null,
-        title: `${label(run.low)} – ${label(run.high)}${suffix}`,
-        colour: css(colour),
-        textColour: textOn(colour),
-      };
-    }),
-    end: { label: label(top.high), colour: css(topColour), textColour: textOn(topColour) },
-  };
+function gradientCss(gradient: [number, Rgba][]): string {
+  if (gradient.length === 0) return "linear-gradient(to right, #000, #fff)";
+  const stops = gradient.map(([at, colour]) => {
+    const [red, green, blue, alpha] = rgba(colour);
+    return `rgba(${red},${green},${blue},${alpha / 255}) ${(at * 100).toFixed(2)}%`;
+  });
+  return `linear-gradient(to right, ${stops.join(", ")})`;
 }
 
-/** The gradient over `low`–`high`, with a few of the stops named along it. */
-function continuousLegend(stops: PaletteStop[], low: number, high: number): Legend | null {
-  // A range of a single value would divide by zero and stack every label on
-  // one point; a classification has no such span to divide by, which is why
-  // this guard belongs to the ramp alone.
-  if (!(low < high)) return null;
+/** Every `every`-th of `count` indices and the last, in order. */
+function everyNth(count: number, every: number): number[] {
+  const picked = new Set([count - 1]);
+  for (let i = 0; i < count; i += every) picked.add(i);
+  return [...picked].sort((a, b) => a - b);
+}
 
-  const at = (value: number) => ((value - low) / (high - low)) * 100;
-  const gradient = `linear-gradient(to right, ${stops
-    .map((stop) => {
-      const [red, green, blue, alpha] = rgba(stop);
-      return `rgba(${red},${green},${blue},${alpha / 255}) ${at(stop[0]).toFixed(1)}%`;
-    })
-    .join(", ")})`;
-
-  const values = stops.map(([value]) => value);
-  const every = Math.max(1, Math.round((stops.length - 1) / (TICKS - 1)));
-  const ticks = values
-    .filter((_, index) => index % every === 0 || index === stops.length - 1)
-    .map((value) => ({
-      value,
-      label: label(value),
-      at: at(value),
-      textColour: textOn(composite(sample(stops, value))),
-    }));
-
-  return { kind: "continuous", gradient, ticks };
+/** A legend that does not say which ticks to label: at most six, as before core's #812. */
+function capped(count: number): number[] {
+  return count ? everyNth(count, Math.max(1, Math.ceil((count - 1) / (MAX_LABELS - 1)))) : [];
 }
 
 /**
- * The legend for a palette over `min`–`max`, or `null` when there is nothing to
- * draw: no stops, or a ramp whose range collapsed to a single value.
+ * Which of the labels to show, given each one's `[left, right]` in pixels: the
+ * densest every-nth under which no two overlap, both ends kept; the first alone
+ * when even the two ends overlap. Positions in the returned list, not indices.
+ * Core's `legend.js` `fitting`, ported.
  */
-export function legendBar(
-  palette: PaletteStop[] | null | undefined,
-  min?: number | null,
-  max?: number | null,
-  unit = "",
-): Legend | null {
-  if (!palette || palette.length === 0) return null;
-  const stops = sorted(palette);
-  const classes = classification(runs(stops));
-  if (classes) return steppedLegend(classes, unit);
+export function fitting(extents: [number, number][], gap = LABEL_GAP): number[] {
+  const count = extents.length;
+  for (let every = 1; every < count; every++) {
+    const picked = everyNth(count, every);
+    const clear = picked.every((index, at) => at === 0 || extents[picked[at - 1]][1] + gap <= extents[index][0]);
+    if (clear) return picked;
+  }
+  return count ? [0] : [];
+}
 
-  const values = stops.map(([value]) => value);
-  const low = typeof min === "number" ? min : Math.min(...values);
-  const high = typeof max === "number" ? max : Math.max(...values);
-  return continuousLegend(stops, low, high);
+/** Where a label of `size` pixels spans on a bar `width` wide, hung as `align` says. */
+export function extent(at: number, size: number, width: number, align: LegendLabel["align"]): [number, number] {
+  const point = (at / 100) * width;
+  const left = align === "start" ? point : align === "end" ? point - size : point - size / 2;
+  return [left, left + size];
+}
+
+/** The legend to draw for core's layout, or null when there is none. */
+export function legendBar(legend: ServerLegend | null | undefined): Legend | null {
+  if (!legend) return null;
+  const gradient = legend.gradient ?? [];
+  const ticks = legend.ticks ?? [];
+  const labelled = legend.labels ?? capped(ticks.length);
+  const arrow = (colour: Rgba | undefined) => (colour ? css(composite(rgba(colour))) : null);
+
+  return {
+    gradient: gradientCss(gradient),
+    labels: labelled
+      .filter((index) => index >= 0 && index < ticks.length)
+      .map((index) => {
+        const [position, value] = ticks[index];
+        const backdrop = gradient.length ? composite(colourAt(gradient, position)) : BACKDROP;
+        return {
+          index,
+          text: label(value),
+          at: position * 100,
+          align: position <= 0 ? "start" : position >= 1 ? "end" : "middle",
+          textColour: textOn(backdrop),
+        };
+      }),
+    stepped: Boolean(legend.stepped),
+    under: legend.under === "transparent" ? null : arrow(gradient[0]?.[1]),
+    over: legend.over === "transparent" ? null : arrow(gradient.at(-1)?.[1]),
+  };
 }
