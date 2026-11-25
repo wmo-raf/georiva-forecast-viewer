@@ -23,8 +23,16 @@ def make_collection(slug="ecmwf-ifs", *, variables=IFS_VARIABLES, visibility=Non
         collection.save(update_fields=["visibility"])
     unit, _ = Unit.objects.get_or_create(name="Unit", defaults={"symbol": "1"})
     for variable_slug in variables:
+        # Stored and served in one unit: core requires the unit a variable's
+        # data is stored in (ADR 0046), and these variables convert nothing.
         Variable.objects.create(
-            collection=collection, slug=variable_slug, name=variable_slug, unit=unit, value_min=-50, value_max=50
+            collection=collection,
+            slug=variable_slug,
+            name=variable_slug,
+            source_unit=unit,
+            unit=unit,
+            value_min=-50,
+            value_max=50,
         )
     return collection
 
@@ -40,11 +48,16 @@ def make_source(collection, slug="ifs", **fields):
 
 
 def give_unit(collection, variable_slug, symbol):
-    """Store one of the collection's variables in ``symbol``, as core's ingestion would have converted it."""
+    """Store and serve one of the collection's variables in ``symbol``.
+
+    Both units, because a unit-blind ``"1"`` cannot convert into a pressure:
+    core refuses that conversion (ADR 0046). The variable holds no data yet, so
+    its source unit is not locked."""
     unit, _ = Unit.objects.get_or_create(symbol=symbol, defaults={"name": symbol})
     variable = collection.variables.get(slug=variable_slug)
+    variable.source_unit = unit
     variable.unit = unit
-    variable.save(update_fields=["unit"])
+    variable.save(update_fields=["source_unit", "unit"])
     return variable
 
 
