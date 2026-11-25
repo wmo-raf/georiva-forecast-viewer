@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cellOf,
   dayCells,
+  followScroll,
   nearestStepInCell,
   progressWithin,
   stepAtFraction,
@@ -125,5 +126,33 @@ describe("naming one step", () => {
     // The same instant, written +03:00: a forecast time must not shift by the
     // zone it happens to be written in, or it would leave its own cell.
     expect(stepLabel("2026-11-03T18:00:00+03:00")).toBe("Tue 3 · 15:00 UTC");
+  });
+});
+
+describe("following the playhead along a strip that scrolls", () => {
+  // Ten 50px cells in a 200px viewport, a margin of one cell.
+  const follow = (playhead: number, scroll: number) => followScroll(playhead, scroll, 200, 500, 50);
+
+  it("stays put while the playhead is clear of both edges", () => {
+    expect(follow(120, 0)).toBe(0);
+    expect(follow(240, 100)).toBe(100);
+  });
+
+  it("scrolls just far enough to put the playhead back a margin from the edge it neared", () => {
+    expect(follow(170, 0)).toBe(20);
+    expect(follow(130, 100)).toBe(80);
+  });
+
+  it("never scrolls past either end of the content", () => {
+    expect(follow(490, 100)).toBe(300);
+    expect(follow(10, 100)).toBe(0);
+  });
+
+  it("does not scroll when everything fits", () => {
+    expect(followScroll(180, 0, 300, 300, 50)).toBe(0);
+  });
+
+  it("holds the margin to half a narrow viewport", () => {
+    expect(followScroll(100, 0, 60, 500, 50)).toBe(70);
   });
 });

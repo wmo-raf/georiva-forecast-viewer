@@ -7,7 +7,7 @@
  * and the strip must not shift by the viewer's zone.
  */
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export interface DayCell {
   /** `YYYY-MM-DD` in UTC. */
@@ -120,4 +120,31 @@ export function tooltipAnchor(playheadPx: number, labelWidth: number, stripWidth
   const left = labelWidth >= stripWidth ? stripWidth / 2 : Math.min(stripWidth - half, Math.max(half, playheadPx));
   const reach = Math.max(ARROW_INSET, Math.min(labelWidth - ARROW_INSET, half + (playheadPx - left)));
   return { left, arrow: reach };
+}
+
+/**
+ * Where to scroll the days so the playhead stays in view, or the current
+ * scroll when it already is.
+ *
+ * The strip scrolls only once the playhead comes within `margin` of an edge,
+ * and then only as far as puts it back at that margin: following it, not
+ * centring it, so playback does not slide the whole strip on every frame. The
+ * margin is held to half the viewport, so a viewport narrower than two margins
+ * still has somewhere for the playhead to stand. All in pixels across the
+ * scrolling content.
+ */
+export function followScroll(
+  playheadPx: number,
+  scrollLeft: number,
+  viewportWidth: number,
+  contentWidth: number,
+  margin: number,
+): number {
+  const maxScroll = Math.max(0, contentWidth - viewportWidth);
+  if (maxScroll === 0) return 0;
+  const reach = Math.min(margin, viewportWidth / 2);
+  let next = scrollLeft;
+  if (playheadPx < scrollLeft + reach) next = playheadPx - reach;
+  else if (playheadPx > scrollLeft + viewportWidth - reach) next = playheadPx - viewportWidth + reach;
+  return Math.min(maxScroll, Math.max(0, next));
 }

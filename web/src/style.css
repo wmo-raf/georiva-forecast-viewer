@@ -14,10 +14,13 @@
   /* The bottom-right column — model picker, toolbar, legend — is this wide,
      which is the legend's: wide enough for its labels (`ui/legend.ts`). */
   --fv-corner-w: 360px;
-  /* The narrowest the days are worth drawing: below this the run pill gives
-     up its place on the line. Three cells of a two-digit date need about
-     170px, so this leaves room to spare at the moment it wraps. */
-  --fv-days-min: 260px;
+  /* The narrowest the controls and the days together are worth drawing:
+     below this the run pill gives up its place on the line. The controls
+     take about 90px, which leaves about five cells beside them. */
+  --fv-days-min: 320px;
+  /* The narrowest a day cell goes — a touch target. Past this the days
+     scroll rather than squeeze. */
+  --fv-cell-min: 44px;
   /* MapLibre's compact credit in the bottom-right corner: the 24px ⓘ and the
      10px margin it keeps around itself. Its expanded form is wider but no
      taller, so standing above this band clears the credit either way. */
@@ -1119,13 +1122,28 @@ button {
 
 /* ---- the time control ---- */
 
-/* The one control, floating to the left of the days as a circle of the bar's
-   own height. It is filled rather than panelled: it is the only thing to
-   press, so it does not need a panel's border to be found, and a solid fill
-   has nothing to blur behind it. */
-.strip__play:disabled {
+/* Previous, play and next as one pill: the play filled, as the one thing
+   most often pressed, and the steps either side of it plain icons on the
+   panel. */
+.strip__controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--fv-bar-h);
+  box-sizing: border-box;
+  padding: 0 2px;
+  background: var(--fv-panel);
+  border: 1px solid var(--fv-border);
+  border-radius: calc(var(--fv-bar-h) / 2);
+  box-shadow: var(--fv-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.strip__play:disabled,
+.strip__nudge:disabled {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .run__skel {
@@ -1136,21 +1154,36 @@ button {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: var(--fv-bar-h);
-  height: var(--fv-bar-h);
-  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
-  box-shadow: var(--fv-shadow);
   background: var(--fv-fg);
   color: var(--fv-accent-fg);
   cursor: pointer;
 }
 
-/* No padding of its own, so the cells reach its edge and the rounding clips
-   them — the legend's treatment. Not that it may clip: the tooltip stands
-   above the panel and is a child of it, so the end cells round themselves
-   instead. */
+.strip__nudge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--fv-fg);
+  cursor: pointer;
+}
+
+.strip__nudge:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The panel: chrome, and the anchor the label stands on. It does not clip —
+   the label stands above it — so the scroller inside does, to its rounding. */
 .strip__days {
   position: relative;
   flex: 1 1 auto;
@@ -1163,51 +1196,77 @@ button {
   border-radius: var(--fv-radius);
   box-shadow: var(--fv-shadow);
   backdrop-filter: blur(10px);
-  /* The whole panel scrubs on press-and-drag, so a touch drag must not take
-     the page with it. */
-  touch-action: none;
   user-select: none;
 }
 
-/* One line per cell: the day number and its weekday side by side. Two lines
-   is what made the control twice as tall as it needs to be.
+/* The window onto the days. It scrolls when they do not fit, with no
+   scrollbar — the playhead is followed, the wheel and a trackpad scroll it,
+   and a fade on each edge with days beyond it says there is more. The whole
+   panel scrubs on press-and-drag, so a touch drag must not take the page (or
+   the strip) with it; the drag scrolls the strip itself, at the edges. */
+.strip__scroller {
+  --fv-fade-l: 0px;
+  --fv-fade-r: 0px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-radius: 11px;
+  touch-action: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fv-fade-l),
+    #000 calc(100% - var(--fv-fade-r)),
+    transparent
+  );
+}
 
-   A grid rather than a flex row, for the one thing flex cannot do here:
-   baseline-aligned flex items are packed to the top of the line, so the pair
-   would sit against the cell's top edge. On a grid the two share a baseline
-   within their row and `align-content` then centres that row in the cell. */
+.strip__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.strip__scroller--left {
+  --fv-fade-l: 28px;
+}
+
+.strip__scroller--right {
+  --fv-fade-r: 28px;
+}
+
+/* Every day at least `--fv-cell-min`, stretched to fill when they all fit.
+   The track is as wide as that makes it, so the playhead is measured across
+   all of it whether it is scrolled or not. */
+.strip__track {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: max(100%, calc(var(--fv-cells, 1) * var(--fv-cell-min)));
+}
+
+/* Two lines in the bar's own height: the date on top, the weekday under it,
+   both small enough to fit. */
 .strip__day {
   flex: 1 1 0;
   min-width: 0;
-  display: grid;
-  grid-auto-flow: column;
-  align-items: baseline;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  column-gap: 5px;
-  padding: 0;
+  gap: 2px;
+  /* Clear of the progress track along the top. */
+  padding: 3px 0 0;
   border: 0;
   border-right: 1px solid var(--fv-border);
   background: rgba(255, 255, 255, 0.03);
+  color: var(--fv-fg);
   cursor: pointer;
   overflow: hidden;
 }
 
-.strip__day:last-child {
+.strip__day:last-of-type {
   border-right: 0;
-}
-
-/* The panel's radius less its 1px border, so the cell meets the corner. Each
-   side on its own, so a one-day run — the single cell being both the first and
-   the last — rounds at both ends rather than only the one declared later. */
-.strip__day:first-child {
-  border-top-left-radius: 11px;
-  border-bottom-left-radius: 11px;
-}
-
-.strip__day:last-child {
-  border-top-right-radius: 11px;
-  border-bottom-right-radius: 11px;
 }
 
 .strip__day--current {
@@ -1215,31 +1274,42 @@ button {
 }
 
 .strip__daynum {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
 }
 
 .strip__weekday {
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fv-muted);
 }
 
-/* The panel's inside, rounded as it is, so the track clips to its corners
-   (the panel itself cannot clip: the label stands outside it). The track is
-   the top 3px of it, right under the label's arrow, and the fill runs along
-   it to the playhead. */
+/* Over the whole track, which the scroller clips to its rounding. The track
+   is the top 3px of it, right under the label's arrow, and the fill runs
+   along it to the playhead. */
 .strip__progress {
   position: absolute;
   inset: 0;
-  border-radius: 11px;
-  overflow: hidden;
   pointer-events: none;
 }
 
 .strip__progress::before,
+.strip__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+}
+
+.strip__progress::before {
+  content: "";
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .strip__fill {
   position: absolute;
   left: 0;
