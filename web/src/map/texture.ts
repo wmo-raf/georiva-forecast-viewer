@@ -4,8 +4,10 @@
  * Titiler derives the image per request (ADR 0021) and says in headers what
  * it drew: `X-Image-Bounds`, which can be narrower than the collection's
  * extent when display clipping crops the map (ADR 0038), and
- * `X-Image-Unscale`, the range the pixels were rescaled over. Reading them
- * off the response is the only way to be right about both, so the PNG is
+ * `X-Image-Unscale`, the range the pixels were rescaled over. A scalar
+ * texture also names `X-Image-Curve`, the curve its codes were encoded through
+ * (core's #787); a vector pair is always linear and names none. Reading them
+ * off the response is the only way to be right about them, so the PNG is
  * fetched here and decoded by the browser into the RGBA pixels WeatherLayers
  * takes as a texture. Its own loader picks a decoder from the URL's
  * extension, which a fetched body no longer has.
@@ -18,6 +20,8 @@ export interface Texture {
   /** [west, south, east, north] */
   bounds: [number, number, number, number];
   unscale: [number, number];
+  /** The curve the codes were encoded through: `linear` where the response names none. */
+  curve: string;
 }
 
 function numbers(header: string | null, expected: number, name: string): number[] {
@@ -71,5 +75,6 @@ export async function loadTexture(url: string): Promise<Texture> {
     image,
     bounds: bounds as Texture["bounds"],
     unscale: unscale as Texture["unscale"],
+    curve: response.headers.get("X-Image-Curve") || "linear",
   };
 }

@@ -822,54 +822,42 @@ button {
   white-space: nowrap;
 }
 
+/* The bar and its arrows, inset from the pill's right rounding — and from its
+   left one when there is no unit to stand there — so an arrow is never cut. */
+.legend__scale {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 10px;
+}
+
+.legend--unitless .legend__scale {
+  padding-left: 10px;
+}
+
+/* Core's layout, as a gradient: equal blocks for a stepped style, the encoding
+   curve's stretch for a continuous one. The values sit on the colours they
+   name. */
 .legend__ramp {
   position: relative;
-  display: flex;
   flex: 1 1 auto;
   min-width: 0;
 }
 
-/* Equal blocks: a classification is not an axis, so a narrow class is as wide
-   as a broad one and always has room for the value that names it. */
-/* Equal blocks: a classification is not an axis, so a narrow class is as wide
-   as a broad one. They divide the ramp between them, whatever it measures. */
-.legend__class {
-  display: flex;
-  align-items: center;
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
+/* A clamped end: values beyond it are drawn in its colour. */
+.legend__arrow {
+  flex: 0 0 7px;
 }
 
-/* The inset is on the value rather than on the block, so that it cannot make
-   one block wider than another: a flex item's padding is added outside the
-   share it is given, and the first block insets further than the rest. */
-.legend__value {
-  margin-left: 4px;
-  white-space: nowrap;
+.legend__arrow--under {
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
 }
 
-/* The first block is cut into by the pill's rounding; its value clears it. */
-.legend__class:first-child .legend__value {
-  margin-left: 10px;
+.legend__arrow--over {
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
-/* The top of the range takes room of its own at the end of the bar rather than
-   floating over the block before it. It carries the last class's colour, so
-   that class reads as one band widened to hold the number that closes it. */
-.legend__end {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  padding: 0 10px 0 2px;
-  white-space: nowrap;
-}
-
-.legend__ramp--smooth {
-  flex: 1 1 auto;
-}
-
-/* On a ramp each value sits on the colour it names, the ends staying inside. */
 .legend__tick {
   position: absolute;
   top: 50%;
@@ -877,16 +865,15 @@ button {
   white-space: nowrap;
 }
 
-/* The ends are nudged clear of the pill's rounding, which would otherwise cut
-   into them — the same inset the first block of a classification gets. */
-.legend__tick:first-child {
+/* The ends hang inward, so they stay on the bar. */
+.legend__tick--start {
   transform: translateY(-50%);
-  margin-left: 8px;
+  padding-left: 3px;
 }
 
-.legend__tick:last-child {
+.legend__tick--end {
   transform: translate(-100%, -50%);
-  margin-left: -8px;
+  padding-right: 3px;
 }
 
 /* ---- bottom bar ---- */

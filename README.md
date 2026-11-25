@@ -101,6 +101,13 @@ organisation, `internal` for nobody. A quantity with no visible source is
 absent with it. Runs, lead times and render hints are not here: the web reads
 them from core's `/api/runs/…` and `/api/edr/collections/…` routes.
 
+The map is drawn as core draws it, from each variable's render contract in
+EDR's `x-georiva`: the raster coloured code by code from `colour_table` (the
+table Titiler colours tiles with), values decoded through `encoding`'s curve,
+and the legend laid out as `legend` says. **This needs GeoRiva core 0.5.0 or
+later.** An older core describes a variable by its stops alone; the viewer then
+says so in place of the raster rather than draw it some other way.
+
 `pressure` rides on every listing of a source that binds the organisation's
 pressure quantity, and is absent otherwise. The web stays unit-blind:
 `interval` is already in the texture's unit (here msl is stored in Pa, so 4 hPa

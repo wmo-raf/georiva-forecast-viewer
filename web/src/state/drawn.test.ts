@@ -4,7 +4,7 @@ import { drawnParameter, type Frame } from "./drawn";
 
 const param = (label: string, top: number): EdrParameter => ({
   label,
-  "x-georiva": { image_unscale: [0, top], palette: [[0, [0, 0, 0]], [top, [255, 255, 255]]] },
+  "x-georiva": { image_unscale: [0, top] },
 });
 
 const temperature = param("Temperature", 50);
