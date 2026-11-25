@@ -155,7 +155,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", closeOnOutside
         @click="pick(i)"
         @pointermove="active = i"
       >
-        <span>{{ formatRun(r.reference_time) }}</span>
+        <span>{{ formatRun(r.reference_time, { full: true }) }}</span>
         <span v-if="i === 0" class="runpick__tag">Latest</span>
       </li>
     </ul>
